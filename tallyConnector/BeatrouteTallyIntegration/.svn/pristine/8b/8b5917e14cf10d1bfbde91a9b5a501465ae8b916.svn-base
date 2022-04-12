@@ -1,0 +1,87 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegration.Database.Scripts
+{
+    public class DbEntities
+    {
+        public const string ScriptForInvoiceHsn = @"ALTER TABLE SalesInvoiceItemLines ADD Column HsnCode NVARCHAR (1, 300) NULL;";
+        public const string ScriptforErrorLogs = @"CREATE TABLE IF NOT EXISTS ErrorLog (
+                                                    Id        NVARCHAR (1, 300) PRIMARY KEY
+                                                                                NOT NULL,
+                                                    Api       NVARCHAR (1, 300),
+                                                    Message   NVARCHAR (1, 300),
+                                                    TimeStamp DATETIME
+                                                    );
+                                                    ";
+
+        public const string ScriptForAlteringLogin = @"ALTER TABLE Login ADD COLUMN Token NVARCHAR(1, 300) NULL;";
+
+        public const string ScriptForLastSyncCustomerOutStandingInCompany = @"ALTER TABLE Company ADD COLUMN LastSyncCustomerOutStanding DATETIME;";
+
+        public const string ScriptForLastSyncStockInCompany = @"ALTER TABLE Company ADD COLUMN LastSyncStock DATETIME;";
+
+        public const string ScriptForAlteringLoginForLogs = @"ALTER TABLE Login ADD COLUMN LastDateTimeForLogs DATETIME;";
+
+        public const string ScriptForAlteringCompanyForOrderStatus = @"ALTER TABLE Company ADD COLUMN OrderStatus BOOLEAN;";
+
+        public const string ScriptForAlteringCompanyForSalesOrderDeletionChceking = @"ALTER TABLE Company ADD COLUMN SalesOrderDeletionChceking BOOLEAN;";
+
+        public const string ScriptForAlteringCustomerForGSTRegistrationtype = @"ALTER TABLE Customers ADD COLUMN GstRegistrationType NVARCHAR (1, 300);";
+
+        public const string ScriptForOrderStatusCreation = @"CREATE TABLE IF NOT EXISTS OrderStatus (
+                                                                Id               NVARCHAR (1, 300) PRIMARY KEY
+                                                                                                   NOT NULL,
+                                                                CompanyId        NVARCHAR (1, 300),
+                                                                VoucherGuid      NVARCHAR (1, 300),
+                                                                AlterId          INTEGER,
+                                                                OrderId          NVARCHAR (1, 300),
+                                                                BeatrouteOrderId NVARCHAR (1, 300),
+                                                                IsPosted         BOOLEAN,
+                                                                IsDeleted        BOOLEAN,
+                                                                IsModified       BOOLEAN,
+                                                                IsCancelled      BOOLEAN,
+                                                                PostedOn         DATETIME,
+                                                                RetryCount       INTEGER,
+                                                                PostingMessage   NVARCHAR (1, 300) 
+                                                            );
+                                                            ";
+
+
+        public const string ScriptForOrderStatusLineCreation = @"CREATE TABLE IF NOT EXISTS OrderStatusLine (
+                                                                    Id               NVARCHAR (1, 300) PRIMARY KEY
+                                                                                                       NOT NULL,
+                                                                    OrderStatusId    NVARCHAR (1, 300) REFERENCES OrderStatus (Id) ON DELETE CASCADE
+                                                                                                                                   ON UPDATE CASCADE,
+                                                                    ItemName         NVARCHAR (1, 300),
+                                                                    Qty              DECIMAL,
+                                                                    ShortCloseDate   DATETIME,
+                                                                    ShortCloseQty    DECIMAL,
+                                                                    ShortCloseReason NVARCHAR (1, 300),
+                                                                    UnitOfMeasure    NVARCHAR (1, 300) 
+                                                                );";
+        public const string ScriptForAlteringCustomerOrderForTallyCompanyId = @"ALTER TABLE CustomerOrder ADD COLUMN TallyCompanyId NVARCHAR (1, 300);";
+
+        public const string ScriptForAlteringCustomerPaymentForTallyCompanyId = @"ALTER TABLE CustomerPayment ADD COLUMN TallyCompanyId NVARCHAR (1, 300);";
+
+        public const string ScriptForAddUpdateDetailsTable = @"CREATE TABLE IF NOT EXISTS UpdateDetails (
+                                                                Id          NVARCHAR (1, 300) PRIMARY KEY
+                                                                                                NOT NULL,    
+                                                                LastUpdateTime DATETIME
+                                                            );";
+        public const string ScriptForAddItemAliasColumnInItemTable = @"ALTER TABLE Items ADD COLUMN ItemAliasName NVARCHAR (1, 300);";
+
+        public const string ScriptForCreateTableSyncStatus = @"CREATE TABLE IF NOT EXISTS SyncStatus (
+                                                                        Id    NVARCHAR (1, 300) PRIMARY KEY
+                                                                                                NOT NULL,
+                                                                        LedgerKey NVARCHAR (1, 300),
+                                                                        LedgerValue NVARCHAR (1, 300),
+                                                                        LedgerErrorStatus NVARCHAR (1, 300)
+                                                                    );
+                                                                    ";
+
+    }
+}

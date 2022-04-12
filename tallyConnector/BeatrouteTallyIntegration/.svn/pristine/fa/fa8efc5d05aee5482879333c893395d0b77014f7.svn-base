@@ -1,0 +1,105 @@
+﻿using BeatrouteTallyIntegration.Utils;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using static BeatrouteTallyIntegrationBase.Utils.Enum;
+
+namespace BeatrouteTallyIntegration.Forms
+{
+    public partial class frmConnectionCheck : Form
+    {
+        private static Logger _logger = LogManager.GetLogger("ApiLog");
+        string baseUrl = string.Empty;
+        public frmConnectionCheck()
+        {
+            InitializeComponent();
+        }
+
+        private void frmConnectionCheck_Load(object sender, EventArgs e)
+        {
+            baseUrl = GetBaseUrl();
+            if (!string.IsNullOrEmpty(baseUrl))
+            {
+                txtBaseUrl.Text = baseUrl; 
+            }
+            else
+            {
+                txtBaseUrl.Text = @"<NULL VALUE>";
+                baseUrl = @"<NULL VALUE>";
+            }
+        }
+
+        private void btnCheck_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                this.Cursor = Cursors.WaitCursor;
+                bool login = ConnectionCheckHelper.GetToken(txtUsername.Text, txtPassword.Text, baseUrl + ApiType.login.ToString());
+                if (!login)
+                {
+                    MessagePopup.ShowError("Connection failed.\n Please check the user credentials and try again or check Apilog for details");
+                    return;
+                }
+                else
+                    MessagePopup.ShowMessage("Connection sucessfull");
+            }
+            finally
+            {
+                this.Cursor = Cursors.Default;
+            }
+        }
+
+        public static string GetBaseUrl()
+        {
+            try
+            {
+                string baseUrl = string.Empty;
+                string dbPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\BeatrouteTallyIntegration\\Database";
+                if (Directory.Exists(dbPath))
+                {
+                    string baseUrlPath = Path.Combine(dbPath, "BaseUrl", "BaseUrl.txt");
+                    baseUrl = File.ReadAllText(baseUrlPath);
+                }
+                return baseUrl.Trim();
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("Exception at reading the base url text file");
+                _logger.Fatal("");
+
+                _logger.Fatal("There is an exception in GetReponse method");
+                _logger.Fatal("");
+
+                _logger.Fatal("The exception is : " + ex.Message);
+                _logger.Fatal("");
+
+                _logger.Fatal("The exception source : " + ex.Source);
+                _logger.Fatal("");
+
+                _logger.Fatal("The exception data : " + ex.Data);
+                _logger.Fatal("");
+
+                _logger.Fatal("The inner exception of the web exception is : " + ex.InnerException);
+                _logger.Fatal("");
+
+                _logger.Fatal("Stack Trace : " + ex.StackTrace);
+                _logger.Fatal("");
+
+                return string.Empty;
+            }
+        }
+
+        private void btnClose_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+    }
+}

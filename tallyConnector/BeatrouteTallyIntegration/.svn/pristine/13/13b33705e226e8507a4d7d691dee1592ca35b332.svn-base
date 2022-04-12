@@ -1,0 +1,2046 @@
+﻿using BeatrouteTallyIntegrationBase.API;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationBase.Helpers;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.Dynamic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using static BeatrouteTallyIntegrationBase.Utils.Enum;
+
+namespace BeatrouteTallyIntegrationBase.Utils
+{
+    public static class ApiHelper
+    {
+        #region Global Variables
+
+        static List<string> _missingfields = new List<string>();
+        private static Logger _logger = LogManager.GetLogger("ApiLog");
+        private static Logger _appLogger = LogManager.GetLogger("AppLog");
+        private static int _errorCount = 0;
+
+        private static Logger _outstanindgsLogger = LogManager.GetLogger("OutstandingLog");
+        private static Logger _skuLogger = LogManager.GetLogger("SKULog");
+        private static Logger _salesInvoiceLogger = LogManager.GetLogger("SalesInvoiceLog");
+        private static Logger _salesOrderLogger = LogManager.GetLogger("SalesOrderLog");
+        private static Logger _stockLogger = LogManager.GetLogger("StockLog");
+
+        #endregion
+
+        #region Post Functions
+        public static bool PostItems(List<Items> itemsList)
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    //Creating a list of items for posting
+                    List<items> apiItemList = new List<items>();
+                    _errorCount = 0;
+                    SyncStatus postStatusForSKUS = GetSyncStatusObject(uow, SyncStatusTextMessageHelper.Skus);
+                    SaveSyncStatusInDb(uow, postStatusForSKUS, SyncStatusCondition.PostStarting);
+
+                    foreach (Items item in itemsList)
+                    {
+                        Company company = uow.Company.GetList().Where(x => x.Guid == item.CompanyId).FirstOrDefault();
+
+                        if (company != null)
+                        {
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|Processing items: Item Name - " + item.ItemName + ", Item Id - " + item.ItemId + ", Company - " + company.CompanyName + "^");
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+                        }
+                        else
+                        {
+                            ErrorLogger.LogError(_logger, "Items", "ApiHelper|" + Session.UserName + "|Company with guid: " + item.CompanyId + " not found in database" + "^");
+                            continue;
+                        }
+
+                        items apiItem = new items();
+                        apiItem.companyId = item.CompanyId;
+                        apiItem.itemId = item.ItemId;
+                        apiItem.itemName = item.ItemName;
+                        apiItem.itemAliasName = item.ItemAliasName;
+                        apiItem.itemGroup = item.ItemGroup;
+                        apiItem.itemCategory = item.ItemCategory;
+                        apiItem.partCode = item.PartCode;
+                        apiItem.unitOfMeasure = item.UnitOfMeasure;
+                        apiItem.altUnitOfMeasure = item.AltUnitOfMeasure;
+                        apiItem.conversionNumerator = item.ConversionNumerator;
+                        apiItem.conversionDenominator = item.ConversionDenominator;
+
+                        apiItem = (items)Helpers.ReplaceNullsWithEmptyString(apiItem);
+                        apiItemList.Add(apiItem);
+                    }
+
+                    //Post the items
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|Begin api call for Items for url - " + Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.items.ToString() + "^");
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Post Items started..." + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                    ApiResponse apiResponse = new ApiResponse();
+                    apiResponse = RestUtility.PostData(apiItemList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.items.ToString(), Utils.Enum.RequestType.Item);
+
+                    if (CheckLoginError(apiResponse))
+                    {
+                        Relogin();
+                        apiResponse = RestUtility.PostData(apiItemList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.items.ToString(), Utils.Enum.RequestType.Item);
+                    }
+
+                    //Check the api response. If error then log error in object else mark item wise posting status
+                    //If code is not 200 then there is an error in the request
+                    if (apiResponse.ResponseCode != "200" && apiResponse.ResponseCode != "OK")
+                    {
+                        ErrorLogger.LogError(_logger, "Items", "ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                        SaveSyncStatusInDb(uow, postStatusForSKUS, SyncStatusCondition.ApiErrorForOthers);
+                        _skuLogger.Info("ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                        _skuLogger.Info("");
+                        return false;
+                    }
+                    string response = apiResponse.Response;
+                    var success = JObject.Parse(response)["status"].ToString();
+
+                    int itemCount = 0;
+                    if (success.ToLower() == "success")
+                    {
+                        try
+                        {
+                            JToken statusResponse = JObject.Parse(response)["data"];
+                            foreach (var item in statusResponse?.Children())
+                            {
+                                var itemId = item["itemId"]?.ToString();
+                                Items items = itemsList.Where(x => x.ItemId == itemId).FirstOrDefault();
+                                if (items != null)
+                                {
+                                    items.IsPosted = CheckSuccess(item["status"]?.ToString(), "status");
+                                    items.PostingMessage = success;
+                                    items.RetryCount = items.RetryCount + 1;
+                                    items.PostedOn = apiResponse.Timestamp;
+                                    uow.Items.Update(items);
+                                    itemCount++;
+                                }
+                            }
+                            SaveSyncStatusInDb(uow, postStatusForSKUS, SyncStatusCondition.PostEnded);
+                        }
+                        catch (Exception ex)
+                        {
+                            if (ex.Message.Contains("Nullable object must have a value."))
+                            {
+                                ErrorLogger.LogError(_logger, "Items", "ApiHelper|" + Session.UserName + "|Items API does not contain any data in the response." + "^");
+                            }
+                            else
+                            {
+                                SaveSyncStatusInDb(uow, postStatusForSKUS, SyncStatusCondition.ApiErrorForOthers);
+                                _skuLogger.Info("ApiHelper | " + Session.UserName + " | Items API does not contain any data in the response." + " ^ ");
+                                _skuLogger.Info("");
+                                throw;
+                            }
+                        }
+                    }
+                    _appLogger.Debug("ImportWorker|" + Session.UserName + "|Posted " + itemCount + " items" + "^");
+                    _appLogger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                }
+                _logger.Info("ApiHelper|" + Session.UserName + "|Items posting completed" + "^");
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                return false;
+            }
+        }
+
+        public static bool PostCustomer(List<Customers> customersList)
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    //Creating a list of customers for posting
+                    List<customers> apiCustomerList = new List<customers>();
+
+                    foreach (Customers customer in customersList)
+                    {
+                        Company company = uow.Company.GetList().Where(x => x.Guid == customer.CompanyId).FirstOrDefault();
+
+                        if (company != null)
+                        {
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|Processing customers: Customer Name - " + customer.CustomerName + ", Company Name - " + company.CompanyName + "^");
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+                        }
+                        else
+                        {
+                            ErrorLogger.LogError(_logger, "Customer", "ApiHelper|" + Session.UserName + "|Company with guid: " + customer.CompanyId + " not found in database" + "^");
+                            continue;
+                        }
+
+                        customers apiCustomer = new customers();
+                        apiCustomer.customerId = customer.CustomerId;
+                        apiCustomer.customerName = customer.CustomerName;
+                        apiCustomer.companyId = customer.CompanyId;
+                        apiCustomer.keyContactPerson = customer.KeyContactPerson;
+                        apiCustomer.email = customer.Email;
+                        apiCustomer.mobile = customer.Mobile;
+                        apiCustomer.address1 = customer.Address1;
+                        apiCustomer.address2 = customer.Address2;
+                        apiCustomer.address3 = customer.Address3;
+                        apiCustomer.state = customer.State;
+                        apiCustomer.pinCode = customer.PinCode;
+                        apiCustomer.creditLimit = customer.CreditLimit;
+                        apiCustomer.pan = customer.Pan;
+                        apiCustomer.gstNo = customer.GstNo;
+                        apiCustomer.gstRegistrationType = customer.GstRegistrationType;
+
+                        apiCustomer = (customers)Helpers.ReplaceNullsWithEmptyString(apiCustomer);
+                        apiCustomerList.Add(apiCustomer);
+                    }
+
+                    //Post the customers
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|Begin api call for Customers for url - " + Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.customers + "^");
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Post Customers started..." + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                    ApiResponse apiResponse = new ApiResponse();
+                    apiResponse = RestUtility.PostData(apiCustomerList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.customers, Utils.Enum.RequestType.Customer);
+
+                    if (CheckLoginError(apiResponse))
+                    {
+                        Relogin();
+                        apiResponse = RestUtility.PostData(apiCustomerList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.customers, Utils.Enum.RequestType.Customer);
+                    }
+
+                    //Check the api response. If error then log error in object else mark customer wise posting status
+                    //If code is not 200 then there is an error in the request
+                    if (apiResponse.ResponseCode != "200" && apiResponse.ResponseCode != "OK")
+                    {
+                        ErrorLogger.LogError(_logger, "Customer", "ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                        return false;
+                    }
+                    string response = apiResponse.Response;
+                    var success = JObject.Parse(response)["status"].ToString();
+
+                    int customerCount = 0;
+                    if (success.ToLower() == "success")
+                    {
+                        try
+                        {
+                            JToken statusResponse = JObject.Parse(response)["data"];
+                            foreach (var item in statusResponse?.Children())
+                            {
+                                var customerId = item["customerId"]?.ToString();
+                                Customers customers = customersList.Where(x => x.CustomerId == customerId).FirstOrDefault();
+                                if (customers != null)
+                                {
+                                    customers.IsPosted = CheckSuccess(item["status"]?.ToString(), "status");
+                                    customers.PostingMessage = success;
+                                    customers.RetryCount = customers.RetryCount + 1;
+                                    customers.PostedOn = apiResponse.Timestamp;
+                                    uow.Customers.Update(customers);
+                                    customerCount++;
+                                }
+                            }
+                            
+                        }
+                        catch (Exception ex)
+                        {
+                            if (ex.Message.Contains("Nullable object must have a value."))
+                            {
+                                ErrorLogger.LogError(_logger, "Customer", "ApiHelper|" + Session.UserName + "|Customer API does not contain any data in the response." + "^");
+                            }
+                            else
+                            {
+                                
+                                throw;
+                            }
+                        }
+                    }
+                    _appLogger.Debug("ImportWorker|" + Session.UserName + "|Posted " + customerCount + " customers" + "^");
+                    _appLogger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                }
+                _logger.Info("ApiHelper|" + Session.UserName + "|Customer posting completed" + "^");
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                return false;
+            }
+        }
+
+        public static bool PostSalesInvoice(List<SalesInvoice> salesInvoiceList)
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    _errorCount = 0;
+                    //Creating a list of sales invoices for posting
+                    List<salesInvoice> apiSalesInvoiceList = new List<salesInvoice>();
+                    SyncStatus postStatusForSalesInvoices = GetSyncStatusObject(uow, SyncStatusTextMessageHelper.SalesInvoices);
+                    SaveSyncStatusInDb(uow, postStatusForSalesInvoices, SyncStatusCondition.PostStarting);
+
+                    foreach (SalesInvoice salesInvoice in salesInvoiceList)
+                    {
+                        Company company = uow.Company.GetList().Where(x => x.Guid == salesInvoice.CompanyId).FirstOrDefault();
+                        if (company != null)
+                        {
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|Processing sales invoice: SalesInvoiceNo - " + salesInvoice.SalesInvoiceNo + ", Voucher Type - " + salesInvoice.VoucherType + ", Voucher Date - " + salesInvoice.SalesInvoiceDate + ", Company Name - " + company.CompanyName + "^");
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+                        }
+                        else
+                        {
+                            ErrorLogger.LogError(_logger, "Sales Invoice", "ApiHelper|" + Session.UserName + "|Company with guid: " + salesInvoice.CompanyId + " not found in database" + "^");
+                            continue;
+                        }
+
+                        salesInvoice apiSalesInvoice = new salesInvoice();
+                        apiSalesInvoice.salesInvoiceId = salesInvoice.SalesInvoiceId;
+                        apiSalesInvoice.salesInvoiceNo = salesInvoice.SalesInvoiceNo;
+                        apiSalesInvoice.salesInvoiceDate = salesInvoice.SalesInvoiceDate;
+                        apiSalesInvoice.beatrouteOrderId = salesInvoice.BeatrouteOrderId;
+                        apiSalesInvoice.buyerAddress1 = salesInvoice.BuyerAddress1;
+                        apiSalesInvoice.buyerAddress2 = salesInvoice.BuyerAddress2;
+                        apiSalesInvoice.buyerAddress3 = salesInvoice.BuyerAddress3;
+                        apiSalesInvoice.buyerCustomerName = salesInvoice.BuyerCustomerName;
+                        apiSalesInvoice.buyerGstin = salesInvoice.BuyerGstin;
+                        apiSalesInvoice.buyerState = salesInvoice.BuyerState;
+                        apiSalesInvoice.companyId = salesInvoice.CompanyId;
+                        apiSalesInvoice.customerId = salesInvoice.CustomerId;
+                        apiSalesInvoice.narration = salesInvoice.Narration;
+                        apiSalesInvoice.originalInvoiceDate = salesInvoice.OriginalInvoiceDate;
+                        apiSalesInvoice.originalInvoiceNo = salesInvoice.OriginalInvoiceNo;
+                        apiSalesInvoice.paymentTerms = salesInvoice.PaymentTerms;
+                        apiSalesInvoice.shipToAddress1 = salesInvoice.ShipToAddress1;
+                        apiSalesInvoice.shipToAddress2 = salesInvoice.ShipToAddress2;
+                        apiSalesInvoice.shipToAddress3 = salesInvoice.ShipToAddress3;
+                        apiSalesInvoice.shipToCustomerName = salesInvoice.ShipToCustomerName;
+                        apiSalesInvoice.shipToGstin = salesInvoice.ShipToGstin;
+                        apiSalesInvoice.shipToState = salesInvoice.ShipToState;
+                        apiSalesInvoice.transactionType = salesInvoice.TransactionType;
+                        apiSalesInvoice.voucherType = salesInvoice.VoucherType;
+
+                        List<SalesInvoiceItemLines> itemsLines = uow.SalesInvoiceItemLines.GetList().Where(x => x.InvoiceId == salesInvoice.SalesInvoiceId).ToList();
+                        foreach (SalesInvoiceItemLines item in itemsLines)
+                        {
+                            salesInvoiceitemLines apiItemLines = new salesInvoiceitemLines();
+                            apiItemLines.amount = item.Amount;
+                            apiItemLines.discount = item.Discount;
+                            apiItemLines.itemId = item.ItemId;
+                            apiItemLines.itemName = item.ItemName;
+                            apiItemLines.ledgerName = item.LedgerName;
+                            apiItemLines.qty = item.Qty;
+                            apiItemLines.rate = item.Rate;
+                            apiItemLines.taxRate = item.TaxRate;
+                            apiItemLines.hsnCode = item.HsnCode;
+
+                            apiItemLines = (salesInvoiceitemLines)Helpers.ReplaceNullsWithEmptyString(apiItemLines);
+                            apiSalesInvoice.salesInvoiceLinesItemList.Add(apiItemLines);
+                        }
+
+                        List<TaxAndChargesLines> tcLines = uow.TaxAndChargesLines.GetList().Where(x => x.SalesInvoiceId == salesInvoice.SalesInvoiceId).ToList();
+                        foreach (TaxAndChargesLines taxesAndCharges in tcLines)
+                        {
+                            taxesAndChargesLines apiTaxesAndChargesLines = new taxesAndChargesLines();
+                            apiTaxesAndChargesLines.amount = taxesAndCharges.Amount;
+                            apiTaxesAndChargesLines.ledgerName = taxesAndCharges.LedgerName;
+                            apiTaxesAndChargesLines.percentageRate = taxesAndCharges.PercentageRate;
+                            apiTaxesAndChargesLines.taxType = taxesAndCharges.TaxType;
+
+                            apiTaxesAndChargesLines = (taxesAndChargesLines)Helpers.ReplaceNullsWithEmptyString(apiTaxesAndChargesLines);
+                            apiSalesInvoice.taxesAndChargesLinesList.Add(apiTaxesAndChargesLines);
+                        }
+
+                        apiSalesInvoice = (salesInvoice)Helpers.ReplaceNullsWithEmptyString(apiSalesInvoice);
+                        apiSalesInvoiceList.Add(apiSalesInvoice);
+                    }
+
+                    //Post the sales invoices
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|Begin api call for Sales Invoices for url - " + Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.salesInvoice + "^");
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Post Sales Invoice started..." + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                    ApiResponse apiResponse = new ApiResponse();
+                    apiResponse = RestUtility.PostData(apiSalesInvoiceList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.salesInvoice, Utils.Enum.RequestType.SalesInvoice);
+
+                    if (CheckLoginError(apiResponse))
+                    {
+                        Relogin();
+                        apiResponse = RestUtility.PostData(apiSalesInvoiceList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.salesInvoice, Utils.Enum.RequestType.SalesInvoice);
+                    }
+
+                    //Check the api response. If error then log error in object else mark sales invoice wise posting status
+                    //If code is not 200 then there is an error in the request
+                    if (apiResponse.ResponseCode != "200" && apiResponse.ResponseCode != "OK")
+                    {
+                        ErrorLogger.LogError(_logger, "Sales Invoice", "ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                        SaveSyncStatusInDb(uow, postStatusForSalesInvoices, SyncStatusCondition.ApiErrorForOthers);
+                        _salesInvoiceLogger.Info("ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                        _salesInvoiceLogger.Info("");
+                        return false;
+                    }
+                    string response = apiResponse.Response;
+                    var success = JObject.Parse(response)["status"].ToString();
+
+                    int salesInvoiceCount = 0;
+                    if (success.ToLower() == "success")
+                    {
+                        try
+                        {
+                            JToken statusResponse = JObject.Parse(response)["data"];
+                            foreach (var item in statusResponse?.Children())
+                            {
+                                var salesInvoiceId = item["salesInvoiceId"]?.ToString();
+                                SalesInvoice salesInvoices = salesInvoiceList.Where(x => x.SalesInvoiceId == salesInvoiceId).FirstOrDefault();
+                                if (salesInvoices != null)
+                                {
+                                    salesInvoices.IsPosted = CheckSuccess(item["status"]?.ToString(), "status");
+                                    salesInvoices.PostingMessage = success;
+                                    salesInvoices.RetryCount = salesInvoices.RetryCount + 1;
+                                    salesInvoices.PostedOn = apiResponse.Timestamp;
+                                    uow.SalesInvoice.Update(salesInvoices);
+                                    salesInvoiceCount++;
+                                }
+                            }
+                            SaveSyncStatusInDb(uow, postStatusForSalesInvoices, SyncStatusCondition.PostEnded);
+                        }
+                        catch (Exception ex)
+                        {
+                            if (ex.Message.Contains("Nullable object must have a value."))
+                            {
+                                ErrorLogger.LogError(_logger, "Sales Invoice", "ApiHelper|" + Session.UserName + "|Sales Invoice API does not contain any data in the response." + "^");
+                            }
+                            else
+                            {
+                                SaveSyncStatusInDb(uow, postStatusForSalesInvoices, SyncStatusCondition.ApiErrorForOthers);
+
+                                _salesInvoiceLogger.Info("ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                                _salesInvoiceLogger.Info("");
+                                throw;
+                            }
+                        }
+                    }
+                    _appLogger.Info("ImportWorker|" + Session.UserName + "|Posted " + salesInvoiceCount + " Sales Invoices" + "^");
+                    _appLogger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                }
+                _logger.Info("ApiHelper|" + Session.UserName + "|Sales Invoice posting completed" + "^");
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                return false;
+            }
+        }
+
+        public static bool PostCustomerOutstanding(List<CustomerOutstanding> customerOutstandingList)
+        {
+            try
+            {
+                _errorCount = 0;
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    //Creating a list of customer outstanding for posting
+                    List<customerOutstanding> apiCustomerOutstandingList = new List<customerOutstanding>();
+                    SyncStatus postStatusForOutstandings = GetSyncStatusObject(uow, SyncStatusTextMessageHelper.Outstandings);
+                    SaveSyncStatusInDb(uow, postStatusForOutstandings, SyncStatusCondition.PostStarting);
+
+                    foreach (CustomerOutstanding customerOutstanding in customerOutstandingList)
+                    {
+                        Company company = uow.Company.GetList().Where(x => x.Guid == customerOutstanding.CompanyId).FirstOrDefault();
+                        if (company != null)
+                        {
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|Processing customer outstanding: Company Name - " + company.CompanyName + ", Customer Id - " + customerOutstanding.CustomerId + "^");
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+                        }
+                        else
+                        {
+                            ErrorLogger.LogError(_logger, "Customer Outstanding", "ApiHelper|" + Session.UserName + "|Company with guid: " + customerOutstanding.CompanyId + " not found in database" + "^");
+                            continue;
+                        }
+
+                        customerOutstanding apiCustomerOutstanding = new customerOutstanding();
+                        apiCustomerOutstanding.companyId = customerOutstanding.CompanyId;
+                        apiCustomerOutstanding.customerId = customerOutstanding.CustomerId;
+                        apiCustomerOutstanding.outstandingAmount = customerOutstanding.OutstandingAmount;
+                        apiCustomerOutstanding.timestamp = customerOutstanding.Timestamp;
+
+                        apiCustomerOutstanding = (customerOutstanding)Helpers.ReplaceNullsWithEmptyString(apiCustomerOutstanding);
+                        apiCustomerOutstandingList.Add(apiCustomerOutstanding);
+                    }
+                    //Post the customer outstanding
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|Begin api call for Customer Outstanding for url - " + Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.customerOutstanding.ToString() + "^");
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Post Customer Outstanding started..." + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                    ApiResponse apiResponse = new ApiResponse();
+                    apiResponse = RestUtility.PostData(apiCustomerOutstandingList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.customerOutstanding.ToString(), Utils.Enum.RequestType.CustomerOutstanding);
+
+                    if (CheckLoginError(apiResponse))
+                    {
+                        Relogin();
+                        apiResponse = RestUtility.PostData(apiCustomerOutstandingList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.customerOutstanding.ToString(), Utils.Enum.RequestType.CustomerOutstanding);
+                    }
+
+                    //Check the api response. If error then log error in object else mark customer outstanding wise posting status
+                    //If code is not 200 then there is an error in the request
+                    if (apiResponse.ResponseCode != "200" && apiResponse.ResponseCode != "OK")
+                    {
+                        ErrorLogger.LogError(_logger, "Customer Outstanding", "ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                        SaveSyncStatusInDb(uow, postStatusForOutstandings, SyncStatusCondition.ApiErrorForOthers);
+                        _outstanindgsLogger.Info("ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                        _outstanindgsLogger.Info("");
+                        return false;
+                    }
+                    string response = apiResponse.Response;
+                    var success = JObject.Parse(response)["status"].ToString();
+
+                    int customerOutstandingCount = 0;
+                    if (success.ToLower() == "success")
+                    {
+                        try
+                        {
+                            JToken statusResponse = JObject.Parse(response)["data"];
+                            foreach (var item in statusResponse?.Children())
+                            {
+                                var customerId = item["customerId"]?.ToString();
+                                CustomerOutstanding customerOutstanding = customerOutstandingList.Where(x => x.CustomerId == customerId).FirstOrDefault();
+                                if (customerOutstanding != null)
+                                {
+                                    customerOutstanding.IsPosted = CheckSuccess(item["status"]?.ToString(), "status");
+                                    customerOutstanding.PostingMessage = success;
+                                    customerOutstanding.RetryCount = customerOutstanding.RetryCount + 1;
+                                    customerOutstanding.PostedOn = apiResponse.Timestamp;
+                                    uow.CustomerOutstanding.Update(customerOutstanding);
+                                    customerOutstandingCount++;
+                                }
+                            }
+                            SaveSyncStatusInDb(uow, postStatusForOutstandings, SyncStatusCondition.PostEnded);
+                        }
+                        catch (Exception ex)
+                        {
+                            if (ex.Message.Contains("Nullable object must have a value."))
+                            {
+                                ErrorLogger.LogError(_logger, "Customer Outstanding", "ApiHelper|" + Session.UserName + "|Customer Outstanding API does not contain any data in the response." + "^");
+                            }
+                            else
+                            {
+                                SaveSyncStatusInDb(uow, postStatusForOutstandings, SyncStatusCondition.PostEnded);
+                                _outstanindgsLogger.Info("ApiHelper|" + Session.UserName + "|Customer Outstanding API does not contain any data in the response." + "^");
+                                _outstanindgsLogger.Info("");
+                                throw;
+                            }
+                               
+                        }
+                    }
+                    _appLogger.Debug("ImportWorker|" + Session.UserName + "|Posted " + customerOutstandingCount + " Customer Outstandings" + "^");
+                    _appLogger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                }
+                _logger.Info("ApiHelper|" + Session.UserName + "|Customer Outstanding posting completed" + "^");
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                return false;
+            }
+        }
+
+        public static bool PostStock(List<Stock> stockList)
+        {
+            try
+            {
+                _errorCount = 0;
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    //Creating a list of stocks for posting
+                    List<stock> apiStockList = new List<stock>();
+                    SyncStatus postStatusForStock = GetSyncStatusObject(uow, SyncStatusTextMessageHelper.Stocks);
+                    SaveSyncStatusInDb(uow, postStatusForStock, SyncStatusCondition.PostStarting);
+                    foreach (Stock stock in stockList)
+                    {
+                        Company company = uow.Company.GetList().Where(x => x.Guid == stock.CompanyId).FirstOrDefault();
+
+                        if (company != null)
+                        {
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|Processing stock: Company Name - " + company.CompanyName + ", Item Id - " + stock.ItemId + "^");
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+                        }
+                        else
+                        {
+                            ErrorLogger.LogError(_logger, "Stock", "ApiHelper|" + Session.UserName + "|Company with guid: " + stock.CompanyId + " not found in database" + "^");
+                            continue;
+                        }
+
+                        stock apiStock = new stock();
+                        apiStock.amount = stock.Amount;
+                        apiStock.companyId = stock.CompanyId;
+                        apiStock.godown = stock.Godown;
+                        apiStock.itemId = stock.ItemId;
+                        apiStock.qty = stock.Qty;
+                        apiStock.timestamp = stock.Timestamp;
+
+                        apiStock = (stock)Helpers.ReplaceNullsWithEmptyString(apiStock);
+                        apiStockList.Add(apiStock);
+                    }
+                    //Post the stock
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Begin api call for Stock for url - " + Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.stock.ToString() + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                    ApiResponse apiResponse = new ApiResponse();
+                    apiResponse = RestUtility.PostData(apiStockList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.stock.ToString(), Utils.Enum.RequestType.Stock);
+
+                    if (CheckLoginError(apiResponse))
+                    {
+                        Relogin();
+                        apiResponse = RestUtility.PostData(apiStockList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.stock.ToString(), Utils.Enum.RequestType.Stock);
+                    }
+
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Post Stocks started..." + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+
+                    //Check the api response. If error then log error in object else mark stock wise posting status
+                    //If code is not 200 then there is an error in the request
+                    if (apiResponse.ResponseCode != "200" && apiResponse.ResponseCode != "OK")
+                    {
+                        ErrorLogger.LogError(_logger, "Stock", "ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                        SaveSyncStatusInDb(uow, postStatusForStock, SyncStatusCondition.ApiErrorForOthers);
+                        _stockLogger.Info("ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                        _stockLogger.Info("");
+                        return false;
+                    }
+                    string response = apiResponse.Response;
+                    var success = JObject.Parse(response)["status"].ToString();
+
+                    int stockCount = 0;
+                    if (success.ToLower() == "success")
+                    {
+                        try
+                        {
+                            JToken statusResponse = JObject.Parse(response)["data"];
+                            foreach (var item in statusResponse?.Children())
+                            {
+                                var itemId = item["itemId"]?.ToString();
+                                Stock stock = stockList.Where(x => x.ItemId == itemId).FirstOrDefault();
+                                if (stock != null)
+                                {
+                                    stock.IsPosted = CheckSuccess(item["status"]?.ToString(), "status");
+                                    stock.PostingMessage = success;
+                                    stock.RetryCount = stock.RetryCount + 1;
+                                    stock.PostedOn = apiResponse.Timestamp;
+                                    uow.Stock.Update(stock);
+                                    stockCount++;
+                                }
+                            }
+                            SaveSyncStatusInDb(uow, postStatusForStock, SyncStatusCondition.PostEnded);
+                        }
+                        catch (Exception ex)
+                        {
+                            if (ex.Message.Contains("Nullable object must have a value."))
+                            {
+                                ErrorLogger.LogError(_logger, "Stock", "ApiHelper|" + Session.UserName + "|Stock API does not contain any data in the response." + "^");
+                            }
+                            else
+                            {
+                                SaveSyncStatusInDb(uow, postStatusForStock, SyncStatusCondition.PostEnded);
+                                _outstanindgsLogger.Info("ApiHelper|" + Session.UserName + "|Stock API does not contain any data in the response." + "^");
+                                _outstanindgsLogger.Info("");
+                                throw;
+                            }
+
+                        }
+                    }
+                    _appLogger.Debug("ImportWorker|" + Session.UserName + "|Posted " + stockCount + " Stocks" + "^");
+                    _appLogger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                }
+                _logger.Info("ApiHelper|" + Session.UserName + "|Stock posting completed" + "^");
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                return false;
+            }
+        }
+
+        public static bool PostCustomerOrder(List<CustomerOrder> customerOrderList)
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    //Creating a list of customer posted payment for posting
+                    List<customerOrderPost> apiCustomerOrderList = new List<customerOrderPost>();
+
+                    foreach (CustomerOrder customerOrder in customerOrderList)
+                    {
+                        Company company = uow.Company.GetList().Where(x => x.Guid == customerOrder.CompanyId).FirstOrDefault();
+
+                        if (company != null)
+                        {
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|Processing customer order status: Company Name - " + company.CompanyName + ", BeatRoute Order Id - " + customerOrder.BeatrouteOrderId + "^");
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+                        }
+                        else
+                        {
+                            ErrorLogger.LogError(_logger, "Post Customer Order", "ApiHelper|" + Session.UserName + "|Company with guid: " + customerOrder.CompanyId + " not found in database" + "^");
+                            continue;
+                        }
+
+                        customerOrderPost apiCustomerOrder = new customerOrderPost();
+                        apiCustomerOrder.beatrouteOrderId = customerOrder.BeatrouteOrderId;
+                        apiCustomerOrder.companyId = customerOrder.CompanyId;
+                        apiCustomerOrder.isPosted = customerOrder.IsPosted;
+                        apiCustomerOrder.message = customerOrder.PostingMessage;
+
+                        apiCustomerOrder = (customerOrderPost)Helpers.ReplaceNullsWithEmptyString(apiCustomerOrder);
+                        apiCustomerOrderList.Add(apiCustomerOrder);
+                    }
+                    //Post the customer posted payment
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|Begin api call for Customer Order Status for url - " + Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.customerOrder.ToString() + "^");
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Post Customer Order Status started..." + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                    ApiResponse apiResponse = new ApiResponse();
+                    apiResponse = RestUtility.PostData(apiCustomerOrderList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.customerOrder.ToString(), Utils.Enum.RequestType.CustomerOrder);
+
+                    if (CheckLoginError(apiResponse))
+                    {
+                        Relogin();
+                        apiResponse = RestUtility.PostData(apiCustomerOrderList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.customerOrder.ToString(), Utils.Enum.RequestType.CustomerOrder);
+                    }
+
+                    //Check the api response. If error then log error in object else mark customer payment posting confirmation status
+                    //If code is not 200 then there is an error in the request
+                    if (apiResponse.ResponseCode != "200" && apiResponse.ResponseCode != "OK")
+                    {
+                        ErrorLogger.LogError(_logger, "Post Customer Order", "ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                        return false;
+                    }
+                    string response = apiResponse.Response;
+                    var success = JObject.Parse(response)["status"].ToString();
+
+                    int customerOrderCount = 0;
+                    if (success.ToLower() == "success")
+                    {
+                        try
+                        {
+                            JToken statusResponse = JObject.Parse(response)["data"];
+                            foreach (var item in statusResponse?.Children())
+                            {
+                                var beatrouteOrderId = item["orderId"]?.ToString();
+                                CustomerOrder customerOrder = customerOrderList.Where(x => x.BeatrouteOrderId == beatrouteOrderId).FirstOrDefault();
+                                //customerOrder.IsPosted = true;
+                                // customerOrder.PostingMessage = success;
+                                //customerOrder.RetryCount = customerOrder.RetryCount + 1;
+                                //customerOrder.PostedOn = apiResponse.Timestamp;
+                                if (customerOrder != null)
+                                {
+                                    customerOrder.ConfirmedOn = DateTime.Now;
+                                    customerOrder.ConfirmedMessage = success;
+                                    customerOrder.IsConfirmed = CheckSuccess(item["status"]?.ToString(), "status");
+                                    uow.CustomerOrder.Update(customerOrder);
+                                    customerOrderCount++;
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            if (ex.Message.Contains("Nullable object must have a value."))
+                            {
+                                ErrorLogger.LogError(_logger, "Post Customer Order ", "ApiHelper|" + Session.UserName + "|Customer Order API does not contain any data in the response." + "^");
+                            }
+                            else
+                                throw;
+                        }
+                    }
+                    _appLogger.Debug("ImportWorker|" + Session.UserName + "|Posted " + customerOrderCount + " Customer Order Status" + "^");
+                    _appLogger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                }
+                _logger.Info("ApiHelper|" + Session.UserName + "|Customer Order status posting completed" + "^");
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                return false;
+            }
+        }
+
+        public static bool PostCustomerPaymentPostingConfirmation(List<CustomerPaymentPostingConfirmation> customerPaymentPostingConfirmationList)
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    //Creating a list of customer payment posting confirmation for posting
+                    List<customerPaymentPostingConfirmation> apiCustomerPaymentPostingConfirmationList = new List<customerPaymentPostingConfirmation>();
+
+                    foreach (CustomerPaymentPostingConfirmation customerPaymentPosting in customerPaymentPostingConfirmationList)
+                    {
+                        Company company = uow.Company.GetList().Where(x => x.Guid == customerPaymentPosting.CompanyId).FirstOrDefault();
+
+                        if (company != null)
+                        {
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|Processing customer payment posting confirmation: Company Name - " + company.CompanyName + ", BeatRoute Payment Id - " + customerPaymentPosting.BeatroutePaymentId + "^");
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+                        }
+                        else
+                        {
+                            ErrorLogger.LogError(_logger, "Customer Payment Posting Confirmation", "ApiHelper|" + Session.UserName + "|Company with guid: " + customerPaymentPosting.CompanyId + " not found in database" + "^");
+                            continue;
+                        }
+
+                        customerPaymentPostingConfirmation apiCustomerPaymentPosting = new customerPaymentPostingConfirmation();
+                        apiCustomerPaymentPosting.beatroutePaymentId = customerPaymentPosting.BeatroutePaymentId;
+                        apiCustomerPaymentPosting.companyId = customerPaymentPosting.CompanyId;
+                        apiCustomerPaymentPosting.isSuccess = customerPaymentPosting.IsSuccess;
+                        apiCustomerPaymentPosting.message = customerPaymentPosting.PostingMessage;
+
+                        apiCustomerPaymentPosting = (customerPaymentPostingConfirmation)Helpers.ReplaceNullsWithEmptyString(apiCustomerPaymentPosting);
+                        apiCustomerPaymentPostingConfirmationList.Add(apiCustomerPaymentPosting);
+                    }
+                    //Post the customer payment posting confirmation
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|Begin api call for Customer Payment Posting Confirmation for url - " + Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.customerPaymentPostingConfirmation.ToString() + "^");
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Post Customer Payment Posting Confirmation started..." + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                    ApiResponse apiResponse = new ApiResponse();
+                    apiResponse = RestUtility.PostData(apiCustomerPaymentPostingConfirmationList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.customerPaymentPostingConfirmation.ToString(), Utils.Enum.RequestType.CustomerPaymentPostingConfirmation);
+
+                    if (CheckLoginError(apiResponse))
+                    {
+                        Relogin();
+                        apiResponse = RestUtility.PostData(apiCustomerPaymentPostingConfirmationList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.customerPaymentPostingConfirmation.ToString(), Utils.Enum.RequestType.CustomerPaymentPostingConfirmation);
+                    }
+
+                    //Check the api response. If error then log error in object else mark customer payment posting confirmation status
+                    //If code is not 200 then there is an error in the request
+                    if (apiResponse.ResponseCode != "200" && apiResponse.ResponseCode != "OK")
+                    {
+                        ErrorLogger.LogError(_logger, "Customer Payment Posting Confirmation", "ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                        return false;
+                    }
+                    string response = apiResponse.Response;
+                    var success = JObject.Parse(response)["status"].ToString();
+
+                    int customerPaymentCount = 0;
+                    if (success.ToLower() == "success")
+                    {
+                        JToken statusResponse = JObject.Parse(response)["data"];
+                        foreach (var item in statusResponse.Children())
+                        {
+                            var beatroutePaymentId = item["beatroutePaymentId"].ToString();
+                            CustomerPaymentPostingConfirmation customerPaymentPostingConfirmation = customerPaymentPostingConfirmationList.Where(x => x.BeatroutePaymentId == beatroutePaymentId).FirstOrDefault();
+                            customerPaymentPostingConfirmation.IsPosted = true;
+                            customerPaymentPostingConfirmation.PostedOn = DateTime.Now;
+                            customerPaymentPostingConfirmation.PostingMessage = success;
+                            uow.CustomerPaymentPostingConfirmation.Update(customerPaymentPostingConfirmation);
+                            customerPaymentCount++;
+                        }
+                    }
+                    _appLogger.Debug("ImportWorker|" + Session.UserName + "|Posted " + customerPaymentCount + " Customer Payment Confirmations" + "^");
+                    _appLogger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                }
+                _logger.Info("ApiHelper|" + Session.UserName + "|Customer Payment Posting Confirmation posting completed" + "^");
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                return false;
+            }
+        }
+
+        public static bool PostCustomerPostedPayment(List<CustomerPayment> customerPostedPaymentList)
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    //Creating a list of customer posted payment for posting
+                    List<customerPostedPayment> apiCustomerPostedPaymentList = new List<customerPostedPayment>();
+
+                    foreach (CustomerPayment customerPostedPayment in customerPostedPaymentList)
+                    {
+                        Company company = uow.Company.GetList().Where(x => x.Guid == customerPostedPayment.CompanyId).FirstOrDefault();
+                        _logger.Debug("ApiHelper|" + Session.UserName + "|Processing customer posted payment: Company Id - " + customerPostedPayment.CompanyId + "^");
+                        _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+
+                        customerPostedPayment apiCustomerPostedPayment = new customerPostedPayment();
+                        apiCustomerPostedPayment.beatroutePaymentId = customerPostedPayment.PaymentId;
+                        apiCustomerPostedPayment.companyId = customerPostedPayment.CompanyId;
+                        apiCustomerPostedPayment.isPosted = customerPostedPayment.IsPosted;
+                        apiCustomerPostedPayment.message = customerPostedPayment.PostingMessage;
+
+                        apiCustomerPostedPayment = (customerPostedPayment)Helpers.ReplaceNullsWithEmptyString(apiCustomerPostedPayment);
+                        apiCustomerPostedPaymentList.Add(apiCustomerPostedPayment);
+                    }
+                    //Post the customer posted payment
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|Begin api call for Customer Posted Payment for url - " + Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.customerPostedPayment.ToString() + "^");
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Post Customer Posted Payment started..." + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                    ApiResponse apiResponse = RestUtility.PostData(apiCustomerPostedPaymentList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.customerPostedPayment.ToString(), Utils.Enum.RequestType.CustomerPostedPayment);
+
+                    //Check the api response. If error then log error in object else mark customer payment posting confirmation status
+                    //If code is not 200 then there is an error in the request
+                    if (apiResponse.ResponseCode != "200" && apiResponse.ResponseCode != "OK")
+                    {
+                        ErrorLogger.LogError(_logger, "Customer Posted Payment", "ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                        return false;
+                    }
+                    string response = apiResponse.Response;
+                    var success = JObject.Parse(response)["status"].ToString();
+
+                    int customerPaymentPostedCount = 0;
+                    if (success.ToLower() == "success")
+                    {
+                        try
+                        {
+                            JToken statusResponse = JObject.Parse(response)["data"];
+                            foreach (var item in statusResponse?.Children())
+                            {
+                                var beatroutePaymentId = item["id"]?.ToString();
+                                CustomerPayment customerPostedPayment = customerPostedPaymentList.Where(x => x.PaymentId == beatroutePaymentId).FirstOrDefault();
+                                if (customerPostedPayment != null)
+                                {
+                                    customerPostedPayment.IsConfirmed = CheckSuccess(item["status"]?.ToString(), "status");
+                                    customerPostedPayment.ConfirmedOn = DateTime.Now;
+                                    customerPostedPayment.ConfirmedMessage = success;
+                                    _logger.Debug("ApiHelper|" + Session.UserName + "|Beatroute Payment Id - " + beatroutePaymentId + " updated successfully" + "^");
+                                    _logger.Debug("ApiHelper|" + Session.UserName + "|");
+                                    uow.CustomerPayment.Update(customerPostedPayment);
+                                    customerPaymentPostedCount++;
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            if (ex.Message.Contains("Nullable object must have a value."))
+                            {
+                                ErrorLogger.LogError(_logger, "Customer Posted Payment", "ApiHelper|" + Session.UserName + "|Customer Posted Payment API does not contain any data in the response." + "^");
+                            }
+                            else
+                                throw;
+                        }
+                    }
+                    _appLogger.Debug("ImportWorker|" + Session.UserName + "|Posted " + customerPaymentPostedCount + " Customer Payment Posted Status" + "^");
+                    _appLogger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                }
+                _logger.Info("ApiHelper|" + Session.UserName + "|Customer Posted Payment posting completed" + "^");
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                return false;
+            }
+        }
+
+        public static bool PostSettings()
+        {
+            try
+            {
+                _logger.Info("ApiHelper|" + Session.UserName + "|Processing settings" + "^");
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    settings apiSettings = new settings();
+
+                    Settings tallyIp = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "IP").FirstOrDefault();
+                    if (tallyIp != null)
+                    {
+                        apiSettings.TALLY_IP = tallyIp.Value;
+                    }
+                    Settings tallyPort = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "PORT").FirstOrDefault();
+                    if (tallyPort != null)
+                    {
+                        apiSettings.TALLY_PORT = tallyPort.Value;
+                    }
+                    Settings frequency = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "FREQUENCY").FirstOrDefault();
+                    if (frequency != null)
+                    {
+                        apiSettings.FREQUENCY = frequency.Value;
+                    }
+                    Settings productFilter = uow.Settings.GetList().Where(x => x.Key == "PRODUCT_FILTER").FirstOrDefault();
+                    if (productFilter != null)
+                    {
+                        apiSettings.PRODUCT_FILTER = productFilter.Value;
+                    }
+
+                    workflow workflow = new workflow();//for saving compnay boolean value - go to the Api model of settings
+
+                    Company company = uow.Company.GetList().Where(x => x.IsActive == true).FirstOrDefault();
+                    if (company != null)
+                    {
+                        workflow.POST_SKU = true;
+                        workflow.POST_CUSTOMER = true;
+                        workflow.POST_INVOICE = true;
+                        workflow.GET_ORDER = company.CustomerOrder;
+                        workflow.GET_PAYMENT = company.CustomerPayment;
+                        workflow.POST_OUTSTANDING = company.CustomerOutstanding;
+                        workflow.POST_STOCK = company.Stock;
+                    }
+                    //Stroring the Values as a JSON object
+                    var settingsBody = JsonConvert.SerializeObject(new
+                    {
+                        TALLY_IP = apiSettings.TALLY_IP,
+                        TALLY_PORT = apiSettings.TALLY_PORT,
+                        FREQUENCY = apiSettings.FREQUENCY,
+                        PRODUCT_FILTER = apiSettings.PRODUCT_FILTER,
+                        WORKFLOW = new
+                        {
+                            POST_SKU = workflow.POST_SKU == false && company == null ? true : company.ProductMaster,
+                            POST_CUSTOMER = workflow.POST_CUSTOMER == false && company == null ? true : company.CustomerMaster,
+                            POST_INVOICE = workflow.POST_INVOICE == false && company == null ? true : company.CustomerInvoice,
+                            GET_ORDER = workflow.GET_ORDER == false && company == null ? true : company.CustomerOrder,
+                            GET_PAYMENT = workflow.GET_PAYMENT == false && company == null ? true : company.CustomerPayment,
+                            POST_OUTSTANDING = workflow.POST_OUTSTANDING == false && company == null ? true : company.CustomerOutstanding,
+                            POST_STOCK = workflow.POST_STOCK == false && company == null ? true : company.Stock
+                        }
+                    });
+                    var settingsBodyDeserialize = JsonConvert.DeserializeObject(settingsBody); // Desrializing for sening request body in API
+
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|Begin api call for settings for url - " + Session.BaseUrl + ApiType.setting.ToString() + "^");
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Post Settings started..." + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+
+                    ApiResponse apiResponse = new ApiResponse();
+                    apiResponse = RestUtility.PostData(settingsBodyDeserialize, Session.BaseUrl + ApiType.tally + "/" + ApiType.setting.ToString(), Utils.Enum.RequestType.PostSettings);
+
+                    if (CheckLoginError(apiResponse))
+                    {
+                        Relogin();
+                        apiResponse = RestUtility.PostData(settingsBodyDeserialize, Session.BaseUrl + ApiType.tally + "/" + ApiType.setting.ToString(), Utils.Enum.RequestType.PostSettings);
+                    }
+
+                    if (apiResponse.ResponseCode != "Created" && apiResponse.ResponseCode != "OK")
+                    {
+                        ErrorLogger.LogError(_logger, "Post Settings", "ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                        return false;
+                    }
+
+                    string response = apiResponse.Response;
+                    var responseStatus = JObject.Parse(response)["status"].ToString();
+
+                    if (responseStatus.ToLower() == "success")
+                    {
+                        _logger.Info("ApiHelper|" + Session.UserName + "|Settings posting successfully" + "^");
+                        _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                        return true;
+                    }
+                    else
+                    {
+                        ErrorLogger.LogError(_logger, "Post Settings", "ApiHelper|" + Session.UserName + "|Settings posting failed" + "^");
+                        return false;
+                    }
+                }
+
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                return false;
+            }
+        }
+
+        public static bool PostLogsToBeatRoute(List<SendLogHelper> sendLogHelpers)
+        {
+            List<logs> logsList = new List<logs>();
+            foreach (SendLogHelper logHelpers in sendLogHelpers)
+            {
+                logs logsPost = new logs();
+                logsPost.timeStamp = logHelpers.TimeStamp;
+                logsPost.typeOfLog = logHelpers.TypeOfLog;
+                logsPost.sourceOfLog = logHelpers.SourceOfLog;
+                logsPost.functionality = logHelpers.Functionality;
+                logsPost.userName = logHelpers.UserName;
+                logsPost.message = logHelpers.Message;
+
+                logsPost = (logs)Helpers.ReplaceNullsWithEmptyString(logsPost);
+                logsList.Add(logsPost);
+            }
+            ApiResponse apiResponse = RestUtility.PostData(logsList, Session.LogsUrl, Utils.Enum.RequestType.Logs, true);
+            if (apiResponse.ResponseCode != "Accepted")
+            {
+                ErrorLogger.LogError(_logger, "Post App Log & Api Log", "Import Worker|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                return false;
+            }
+            else
+                return true;
+
+        }
+
+        public static bool PostOrderStatus(List<OrderStatus> orderStatusDal)
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    List<orderStatus> apiOrderStatusList = new List<orderStatus>();
+                    foreach (OrderStatus status in orderStatusDal)
+                    {
+                        Company company = uow.Company.GetList().Where(x => x.Guid == status.CompanyId).FirstOrDefault();
+                        if (company != null)
+                        {
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|Processing Order Status: Order No is - " + status.OrderId + " and Company Id - " + status.CompanyId + "^");
+                            _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+                        }
+                        else
+                        {
+                            ErrorLogger.LogError(_logger, "Order Status", "ApiHelper|" + Session.UserName + "|Company with guid: " + status.CompanyId + " not found in database" + "^");
+                            continue;
+                        }
+                        orderStatus apiOrderStatus = new orderStatus();
+                        apiOrderStatus.beatrouteOrderId = status.BeatrouteOrderId;
+
+                        if (status.IsCancelled == true && status.IsDeleted == false)
+                            apiOrderStatus.status = "Order is Cancelled";
+
+                        else if (status.IsCancelled == false && status.IsDeleted == true)
+                            apiOrderStatus.status = "Order is Deleted";
+
+                        else if (status.IsCancelled == true && status.IsDeleted == true)
+                            apiOrderStatus.status = "Order is Cancelled and Deleted";
+
+                        else if (status.IsCancelled == false && status.IsDeleted == false)
+                            apiOrderStatus.status = "Order is not Cancelled or Deleted";
+
+                        #region No Need for this right now, but don't delete it and also the commented models in orderStatus ApiModel class
+                        //apiOrderStatus.orderId = status.OrderId;
+                        //apiOrderStatus.beatrouteOrderId = status.BeatrouteOrderId;
+                        //apiOrderStatus.companyId = status.CompanyId;
+                        //apiOrderStatus.voucherGuid = status.VoucherGuid;
+                        //apiOrderStatus.alterId = status.AlterId;
+                        //apiOrderStatus.isModified = status.IsModified;
+                        //apiOrderStatus.isCancelled = status.IsCancelled;
+                        //apiOrderStatus.isDeleted = status.IsDeleted;
+
+                        ////saving OrderStatusLine
+                        //List<OrderStatusLine> orderStatusLineList = uow.OrderStatusLine.GetList().Where(x => x.OrderStatusId == status.OrderId).ToList();
+                        //foreach(OrderStatusLine statusLine in orderStatusLineList)
+                        //{
+                        //    orderStatusLine apiorderStatusLine = new orderStatusLine();
+                        //    apiorderStatusLine.orderStatusId = statusLine.OrderStatusId;
+                        //    apiorderStatusLine.itemName = statusLine.ItemName;
+                        //    apiorderStatusLine.qty = statusLine.Qty;
+                        //    apiorderStatusLine.shortCloseDate = statusLine.ShortCloseDate;
+                        //    apiorderStatusLine.shortCloseQty = statusLine.ShortCloseQty;
+                        //    apiorderStatusLine.shortCloseReason = statusLine.ShortCloseReason;
+
+                        //    apiorderStatusLine = (orderStatusLine)Helpers.ReplaceNullsWithEmptyString(apiorderStatusLine);
+                        //    apiOrderStatus.orderStatusLineItemList.Add(apiorderStatusLine);
+                        //}
+                        #endregion
+                        apiOrderStatus = (orderStatus)Helpers.ReplaceNullsWithEmptyString(apiOrderStatus);
+                        apiOrderStatusList.Add(apiOrderStatus);
+                    }
+                    //Post-OrderStatus
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|Begin api call for Order Status for url - " + Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.postOrderStatus + "^");
+                    _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Post Order Status started..." + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+
+                    ApiResponse apiResponse = new ApiResponse();
+                    apiResponse = RestUtility.PostData(apiOrderStatusList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.postOrderStatus, RequestType.PostOrderStatus);
+
+                    if (CheckLoginError(apiResponse))
+                    {
+                        Relogin();
+                        apiResponse = RestUtility.PostData(apiOrderStatusList, Session.BaseUrl + ApiType.tally.ToString() + "/" + ApiType.postOrderStatus, RequestType.PostOrderStatus);
+                    }
+                    //Check the api response. If error then log error in object else mark sales invoice wise posting status
+                    //If code is not 200 then there is an error in the request
+                    if (apiResponse.ResponseCode != "200" && apiResponse.ResponseCode != "OK")
+                    {
+                        ErrorLogger.LogError(_logger, "Order Status", "ApiHelper|" + Session.UserName + "|Code - " + apiResponse.ResponseCode + ", Response - " + apiResponse.ExceptionMessage + "^");
+                        return false;
+                    }
+                    string response = apiResponse.Response;
+                    var success = JObject.Parse(response)["status"].ToString();
+
+                    int orderStatusCount = 0;
+                    if (success.ToLower() == "success")
+                    {
+                        try
+                        {
+                            JToken statusResponse = JObject.Parse(response)["data"];
+                            foreach (var item in statusResponse?.Children())
+                            {
+                                var orderId = item["orderId"]?.ToString();
+                                OrderStatus orderStatus = orderStatusDal.Where(x => x.BeatrouteOrderId == orderId).FirstOrDefault();
+                                if (orderStatus != null)
+                                {
+                                    orderStatus.IsPosted = CheckSuccess(item["status"]?.ToString(), "status");
+                                    orderStatus.PostingMessage = success;
+                                    orderStatus.RetryCount = orderStatus.RetryCount + 1;
+                                    orderStatus.PostedOn = apiResponse.Timestamp;
+                                    uow.OrderStatus.Update(orderStatus);
+                                    orderStatusCount++;
+                                }
+
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            if (ex.Message.Contains("Nullable object must have a value."))
+                            {
+                                ErrorLogger.LogError(_logger, "Order Status", "ApiHelper|" + Session.UserName + "|Order Status API does not contain any data in the response." + "^");
+                            }
+                            else
+                                throw;
+                        }
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                return false;
+            }
+        }
+        #endregion
+
+        #region Get Functions
+        public static bool GetCustomerPayment()
+        {
+            try
+            {
+
+                #region Dummy Response
+                //_logger.Info("Begin api call for get customer payment for url - " + Session.BaseUrl + "tally/" + ApiType.getCustomerPayment.ToString());
+                //ApiResponse apiResponse = RestUtility.PostData(null, Session.BaseUrl + ApiType.tally + "/" + ApiType.getCustomerPayment.ToString(), Utils.Enum.RequestType.GetCustomerPayment);
+
+                //if (apiResponse.ResponseCode != "200" && apiResponse.ResponseCode != "Created" && apiResponse.ResponseCode != "OK")
+                //{
+                //    _logger.Error("Response - " + apiResponse.Response);
+                //    _logger.Error("ApiHelper|" + Session.UserName + "|");
+                //    return false;
+                //}
+                #endregion
+                int totalPayments = 0;
+                int pageCount = 5;
+                for (int currentPage = 0; currentPage < pageCount; currentPage++)
+                {
+                    pagination page = new pagination();
+                    page.page = currentPage;
+
+                    #region Logging About API Call and Customer Payment Syncing 
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Begin api call for get customer payment for url - " + Session.BaseUrl + "tally/" + ApiType.getCustomerPayment.ToString() + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Get Customer Payment started..." + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                    #endregion
+
+                    #region API Resposne, Relogin if Login Error, API response failed checking
+                    ApiResponse pageResponse = new ApiResponse();
+                    pageResponse = RestUtility.PostData(page, Session.BaseUrl + "tally/" + ApiType.getCustomerPayment.ToString(), Utils.Enum.RequestType.GetCustomerPayment);
+
+                    if (CheckLoginError(pageResponse))
+                    {
+                        Relogin();
+                        pageResponse = RestUtility.PostData(page, Session.BaseUrl + "tally/" + ApiType.getCustomerPayment.ToString(), Utils.Enum.RequestType.GetCustomerPayment);
+                    }
+
+                    if (pageResponse.ResponseCode != "200" && pageResponse.ResponseCode != "Created" && pageResponse.ResponseCode != "OK")
+                    {
+
+                        ErrorLogger.LogError(_logger, "Get Customer Payment", "ApiHelper|" + Session.UserName + "|Code - " + pageResponse.ResponseCode + ", Response - " + pageResponse.ExceptionMessage + "^");
+                        ErrorLogger.LogError(_appLogger, "Get Customer Payment", "ImportWorker|" + Session.UserName + "|Get Customer Payment failed. Check ApiLog for details" + "^");
+                        return false;
+                    } 
+                    #endregion
+
+                    var paginationResponse = JObject.Parse(pageResponse.Response)["pagination"];
+                    pageCount = Convert.ToInt32(paginationResponse["pageCount"]);
+
+                    var status = JObject.Parse(pageResponse.Response)["status"];
+
+                    bool success = status.ToString().ToLower() == "success" ? true : false;
+                    if (success == true)
+                    {
+                        var jTokenResponse = JObject.Parse(pageResponse.Response)["data"];
+
+                        if (jTokenResponse != null)
+                        {
+                            using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                            {
+                                foreach (var response in jTokenResponse)
+                                {
+                                    #region Raeding jSON Values from the Response
+                                    string paymentId = CheckNullOrEmpty(response["id"]?.ToString(), "id");  //Subhabrata 23-Sep-2021 : Changed from _id to id on client request
+                                    string companyId = CheckNullOrEmpty(response["companyId"]?.ToString(), "companyId");
+                                    string customerId = CheckNullOrEmpty(response["customerId"]?.ToString(), "customerId");
+                                    Customers customer = uow.Customers.GetList().Where(x => x.CompanyId == companyId && x.Guid == customerId).FirstOrDefault();
+                                    if (customer == null)
+                                    {
+                                        ErrorLogger.LogError(_logger, "Payment From BeatRoute", "ApiHelper|" + Session.UserName + "|GetCustomerPayment API - Sync failed for Customer with Id - " + customerId + " since it is not synced for Company ^");
+                                        continue;
+                                    }
+                                    string customerName = customer.CustomerName;
+                                    string payDate = CheckNullOrEmpty(response["paymentDate"]?.ToString(), "paymentDate");
+                                    DateTime paymentDate = string.IsNullOrEmpty(payDate) ? DateTime.Now : HelperFunctions.ParseDateTime(payDate, "PaymentDate", ApiType.getCustomerPayment.ToString());
+                                    string cashOrBankName = string.Empty;
+                                    string amountString = CheckNullOrEmpty(response["amount"]?.ToString(), "amount");
+                                    decimal amount = string.IsNullOrEmpty(amountString) ? 0 : Convert.ToDecimal(amountString);
+                                    string paymentType = CheckNullOrEmpty(response["mode"]?.ToString(), "mode");
+                                    string tallyCompanyId = CheckNullOrEmpty(response["tallyCompanyId"]?.ToString(), "tallyCompanyId");
+                                    //Biplab 24-Sep-2021 : Filtering Payment Type
+                                    string tempPaymentType = paymentType;
+                                    if (paymentType != "ATM" || paymentType != "Card" || paymentType != "Cheque/DD" || paymentType != "ECS" || paymentType != "e-Fund Transfer" || paymentType != "Electronic Cheque" || paymentType != "Electronic DD/PO")
+                                        paymentType = "Others";
+                                    if (!string.IsNullOrEmpty(tempPaymentType) && tempPaymentType.ToUpper() == "CASH")
+                                    {
+                                        Ledgers cashLedger = uow.Ledgers.GetList().Where(x => x.CompanyId == companyId && x.LedgerGroup == "CASH-IN-HAND").FirstOrDefault();
+                                        if (cashLedger == null)
+                                            cashOrBankName = "Cash";
+                                        else
+                                            cashOrBankName = cashLedger.LedgerName;
+                                    }
+                                    else if (!string.IsNullOrEmpty(tempPaymentType))
+                                    {
+                                        Ledgers bankLedger = uow.Ledgers.GetList().Where(x => x.CompanyId == companyId && x.LedgerGroup == "BANK ACCOUNTS").FirstOrDefault();
+                                        if (bankLedger == null)
+                                            cashOrBankName = "Cash";
+                                        else
+                                            cashOrBankName = bankLedger.LedgerName;
+                                    }
+
+                                    string paymentReference = CheckNullOrEmpty(response["remarks"]?.ToString(), "remarks");
+                                    DateTime referenceDate = paymentDate;
+                                    string remarks = paymentReference; 
+                                    #endregion
+
+                                    CustomerPayment customerPayment = uow.CustomerPayment.GetList().Where(x => x.PaymentId == paymentId && x.CompanyId == companyId).FirstOrDefault();
+                                    var valueCheckingCustomerPayment = customerPayment;
+
+                                    #region Assigning values to the Database cloumns
+                                    customerPayment = new CustomerPayment();
+                                    customerPayment.PaymentId = paymentId;
+                                    customerPayment.CompanyId = companyId;
+                                    customerPayment.CustomerId = customerId;
+                                    customerPayment.CustomerName = customerName;
+                                    customerPayment.PaymentDate = paymentDate;
+                                    customerPayment.CashOrBankName = cashOrBankName;
+                                    customerPayment.Amount = amount;
+                                    customerPayment.PaymentType = paymentType;
+                                    customerPayment.PaymentReference = paymentReference;
+                                    customerPayment.ReferenceDate = referenceDate;
+                                    customerPayment.Narration = remarks;
+                                    customerPayment.ImportedOn = DateTime.Now;
+                                    customerPayment.IsPosted = false;
+                                    customerPayment.PostedOn = new DateTime(2000, 01, 01);
+                                    customerPayment.PostingMessage = "";
+                                    customerPayment.IsConfirmed = false;
+                                    customerPayment.RetryCount++;
+                                    customerPayment.TallyCompanyId = tallyCompanyId;
+                                    #endregion
+
+
+                                    #region Add or Update Customer Payment
+                                    if (valueCheckingCustomerPayment == null)
+                                    {
+                                        uow.CustomerPayment.Add(customerPayment);
+                                        totalPayments++;
+                                    }
+                                    else
+                                    {
+                                        uow.CustomerPayment.Update(customerPayment);
+                                        totalPayments++;
+                                    } 
+                                    #endregion
+
+                                    BillReferences billReferences = uow.BillReferences.GetList().Where(x => x.CompanyId == companyId && x.CustomerPaymentId == customerPayment.PaymentId).FirstOrDefault();
+                                    var valueCheckingBillReferences = billReferences;
+
+                                    #region Assigning values to Bill Reference cloumn
+                                    billReferences = new BillReferences();
+                                    billReferences.BillReferenceAmount = amount;
+                                    billReferences.BillReferenceNo = paymentReference;
+                                    billReferences.CompanyId = companyId;
+                                    billReferences.CustomerPaymentId = paymentId;
+                                    #endregion
+
+                                    #region Updating or Adding Bill Reference
+                                    if (valueCheckingBillReferences == null)
+                                    {
+                                        uow.BillReferences.Add(billReferences);
+                                    }
+                                    else
+                                        uow.BillReferences.Update(billReferences); 
+                                    #endregion
+
+
+                                }
+                            }
+
+                        }
+                        else
+                        {
+                            ErrorLogger.LogError(_logger, "ApiHelper|" + Session.UserName + "|Get Customer Payment", "No response received from Customer Payment (GET) API" + "^");
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        _logger.Info("ApiHelper|" + Session.UserName + "|Customer Payment GET request unsuccessful" + "^");
+                        _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                        return false;
+                    }
+                }
+                _logger.Info("ApiHelper|" + Session.UserName + "|Customer Payment GET response processed successfully. Total payments received: " + totalPayments + "^");
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+
+                _appLogger.Info("ApiHelper|" + Session.UserName + "|Customer Payment GET response processed successfully. Total payments received: " + totalPayments + "^");
+                _appLogger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                return false;
+            }
+        }
+
+        public static bool GetCustomerOrder()
+        {
+            try
+            {
+
+
+                #region Dummy Response
+                //ApiResponse apiResponse = new ApiResponse();
+                //apiResponse.Response = @"{
+                //                     ""Type"": ""InboundDataDTO"",
+                //                     ""AuthToken"": {
+                //                      ""AuthKey"": ""12345""
+                //                     },
+                //                     ""EntityObject"": [
+                //                      {
+                //                       ""ItemLines"": [
+                //                        {
+                //                         ""itemId"": ""4adeb2ab-9867-48fa-b7f7-1cf1b590540f-000000f3"",
+                //                         ""itemName"": ""35ML EMPTY POLY CONTAINER"",
+                //                         ""qty"": 10.0,
+                //                         ""rate"": 20.0,
+                //                         ""amount"": 200.0,
+                //                         ""dueDate"": ""2021-01-01T00:00:00""
+                //                        }
+                //                       ],			                                   
+                //                       ""beatrouteOrderId"": ""1435"",
+                //                                ""orderId"": ""1435111"",
+                //                                ""companyId"": ""4adeb2ab-9867-48fa-b7f7-1cf1b590540f"",
+                //                       ""orderNo"": 243,
+                //                                ""orderDate"": ""2021-06-01T00:00:00"",
+                //                       ""customerId"": 1435,
+                //                       ""customerName"": ""BC-1"",
+                //                                ""termsOfPayment"": ""30"",
+                //                       ""otherReference"": ""OtherRef01"",
+                //                                ""termsOfDelivery"": ""30days"",
+                //                       ""destination"": ""Kolkata"",
+                //                       ""despatchThrough"": ""Train"",
+                //                                ""buyerCustomerName"": ""ABC"",
+                //                                ""buyerAddress1"":""Addr1"",
+                //                                ""buyerAddress2"":""Addr2"",
+                //                                ""buyerAddress3"":""Addr3"",
+                //                                ""buyerState"":""West Bengal"",
+                //                                ""buyerGstin"":""ABC7000"",
+                //                                ""shipToCustomerName"": ""ABC1"",
+                //                       ""shipToAddress1"": ""S1"",
+                //                       ""shipToAddress2"": ""S2"",
+                //                                ""shipToAddress3"": ""S3"",
+                //                                ""shipToState"": ""Maharashtra"",
+                //                                ""shipToGstin"": ""DEF8000"",
+                //                       ""narration"": ""narr1""
+                //                      }
+                //                     ]
+                //                    }"; 
+                #endregion
+
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    int totalOrders = 0;
+                    int pageCount = 5;
+                    _errorCount = 0;
+                    SyncStatus syncStatusForSalesOrder = GetSyncStatusObject(uow, SyncStatusTextMessageHelper.SalesOrders);
+                    SaveSyncStatusInDb(uow, syncStatusForSalesOrder, SyncStatusCondition.SalesOrderSyncStarting);
+
+                    for (int currentPage = 0; currentPage < pageCount; currentPage++)
+                    {
+                        pagination page = new pagination();
+                        page.page = currentPage;
+
+                        #region Logging About API Call and Customer Order Syncing 
+                        _logger.Debug("ApiHelper|" + Session.UserName + "|Begin api call for get Customer Order for url - " + Session.BaseUrl + "tally/" + ApiType.getCustomerOrder.ToString() + "^");
+                        _logger.Debug("ApiHelper|" + Session.UserName + "|" + "^");
+
+                        _logger.Info("ApiHelper|" + Session.UserName + "|Get Customer Order started..." + "^");
+                        _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                        #endregion
+
+                        #region API Resposne, Relogin if Login Error, API response failed checking
+                        ApiResponse pageResponse = new ApiResponse();
+                        pageResponse = RestUtility.PostData(page, Session.BaseUrl + "tally/" + ApiType.getCustomerOrder.ToString(), Utils.Enum.RequestType.GetCustomerOrder);
+
+                        //string value = File.ReadAllText(@"C:\Users\Biplab\Desktop\testDummyResponse.txt");
+                        //pageResponse.Response = value;
+
+
+                        if (CheckLoginError(pageResponse))
+                        {
+                            Relogin();
+                            pageResponse = RestUtility.PostData(page, Session.BaseUrl + "tally/" + ApiType.getCustomerOrder.ToString(), Utils.Enum.RequestType.GetCustomerOrder);
+                        }
+
+                        if (pageResponse.ResponseCode != "200" && pageResponse.ResponseCode != "Created" && pageResponse.ResponseCode != "OK")
+                        {
+                            ErrorLogger.LogError(_logger, "Order From BeatRoute", "ApiHelper|" + Session.UserName + "|Code - " + pageResponse.ResponseCode + ", Response - " + pageResponse.ExceptionMessage + "^");
+                            ErrorLogger.LogError(_appLogger, "Order From BeatRoute", "ImportWorker|" + Session.UserName + "|Get Customer Order failed. Check ApiLog for details" + "^");
+                            SaveSyncStatusInDb(uow, syncStatusForSalesOrder, SyncStatusCondition.ApiErrorForSalesOrder);
+                            _salesOrderLogger.Info("ApiHelper|" + Session.UserName + "|Code - " + pageResponse.ResponseCode + ", Response - " + pageResponse.ExceptionMessage + "^");
+                            _salesOrderLogger.Info("");
+                            SaveSyncStatusInDb(uow, syncStatusForSalesOrder, SyncStatusCondition.ApiErrorForSalesOrder);
+                            _salesOrderLogger.Info("ImportWorker|" + Session.UserName + "|Get Customer Order failed. Check ApiLog for details" + "^");
+                            _salesOrderLogger.Info("");
+                            return false;
+                        }
+                        #endregion
+
+                        var paginationResponse = JObject.Parse(pageResponse.Response)["pagination"];
+                        pageCount = Convert.ToInt32(paginationResponse["pageCount"]);
+
+                        var status = JObject.Parse(pageResponse.Response)["status"];
+
+                        bool success = status.ToString().ToLower() == "success" ? true : false;
+                        if (success == true)
+                        {
+                            var jTokenResponse = JObject.Parse(pageResponse.Response)["data"];
+
+                            if (jTokenResponse != null)
+                            {
+                                foreach (var response in jTokenResponse)
+                                {
+                                    #region Raeding jSON Values from the Response
+
+                                    string beatrouteOrderId = CheckNullOrEmpty(response["orderId"]?.ToString(), "orderId");
+                                    string orderId = CheckNullOrEmpty(response["orderId"]?.ToString(), "orderId");
+                                    string companyId = CheckNullOrEmpty(response["companyId"]?.ToString(), "companyId");
+                                    string orderNo = CheckNullOrEmpty(response["orderId"]?.ToString(), "orderId");
+                                    string oDate = CheckNullOrEmpty(response["orderDate"]?.ToString(), "orderDate");
+                                    DateTime orderDate = string.IsNullOrEmpty(oDate) ? DateTime.Now : HelperFunctions.ParseDateTime(oDate, "OrderDate", ApiType.getCustomerOrder.ToString());
+                                    string customerId = CheckNullOrEmpty(response["customerId"]?.ToString(), "customerId");
+                                    string tallyCompanyId = CheckNullOrEmpty(response["tallyCompanyId"]?.ToString(), "tallyCompanyId");
+
+                                    #endregion
+
+                                    Customers customer = uow.Customers.GetList().Where(x => x.CompanyId == companyId && x.CustomerId == customerId).FirstOrDefault();
+                                    if (customer == null)
+                                    {
+                                        ErrorLogger.LogError(_logger, "Get Customer Order", "ApiHelper|" + Session.UserName + "|GetCustomerOrder API - Sync failed for Customer with Id - " + customerId + " since it is not synced for Company - ^");
+                                        continue;
+                                    }
+                                    #region Get Customer details
+                                    string customerName = customer.CustomerName;
+                                    string buyerCustomerName = CheckNullOrEmpty(response["customerName"]?.ToString(), "customerName");
+                                    string shipToCustomerName = customerName;
+                                    string buyerAddress1 = string.Empty;
+                                    string buyerAddress2 = string.Empty;
+                                    string buyerAddress3 = string.Empty;
+                                    string buyerState = string.Empty;
+                                    string buyerGstin = string.Empty;
+                                    string shipToAddress1 = string.Empty;
+                                    string shipToAddress2 = string.Empty;
+                                    string shipToAddress3 = string.Empty;
+                                    string shipToState = string.Empty;
+                                    string shipToGstin = string.Empty;
+                                    if (customer != null)
+                                    {
+                                        string state = customer.State.Contains("Not Applicable") ? string.Empty : customer.State;    //Subhabrata 29-Sep-2021 : Bug fix for state name
+                                        buyerAddress1 = shipToAddress1 = customer.Address1;
+                                        buyerAddress2 = shipToAddress2 = customer.Address2;
+                                        buyerAddress3 = shipToAddress3 = customer.Address3;
+                                        buyerState = shipToState = state;
+                                        buyerGstin = shipToGstin = customer.GstNo;
+                                    }
+                                    #endregion
+
+                                    #region Commented out code - terms of payment to narration
+                                    //string termsOfPayment = response["termsOfPayment"].ToString();
+                                    //string otherReference = response["otherReference"].ToString();
+                                    //string termsOfDelivery = response["termsOfDelivery"].ToString();
+                                    //string despatchThrough = response["despatchThrough"].ToString();
+                                    //string destination = response["destination"].ToString();
+
+                                    //string narration = response["narration"].ToString(); 
+                                    #endregion
+
+                                    CustomerOrder customerOrder = uow.CustomerOrder.GetList().Where(x => x.OrderId == orderId && x.CompanyId == companyId).FirstOrDefault();
+                                    var checkingValueOfCustomerOrder = customerOrder;
+
+                                    #region Assigning Customer Orders Values to Data base cloumns
+                                    customerOrder = new CustomerOrder();
+                                    customerOrder.BeatrouteOrderId = beatrouteOrderId;
+                                    customerOrder.OrderId = orderId;
+                                    customerOrder.CompanyId = companyId;
+                                    customerOrder.OrderNo = orderNo;
+                                    customerOrder.OrderDate = orderDate;
+                                    customerOrder.CustomerId = customerId;
+                                    customerOrder.CustomerName = customerName;
+
+                                    #region Commented out code - terms of payment to narration
+                                    //customerOrder.TermsOfPayment = termsOfPayment;
+                                    //customerOrder.OtherReference = otherReference;
+                                    //customerOrder.TermsOfDelivery = termsOfDelivery;
+                                    //customerOrder.DespatchThrough = despatchThrough;
+                                    //customerOrder.Destination = destination;
+                                    ////string narration = response["narration"].ToString(); 
+                                    #endregion
+
+                                    customerOrder.BuyerCustomerName = buyerCustomerName;
+                                    customerOrder.BuyerCustomerAddress1 = buyerAddress1;
+                                    customerOrder.BuyerCustomerAddress2 = buyerAddress2;
+                                    customerOrder.BuyerCustomerAddress3 = buyerAddress3;
+                                    customerOrder.BuyerState = buyerState;
+                                    customerOrder.BuyerGstin = buyerGstin;
+                                    customerOrder.ShipToCustomerName = shipToCustomerName;
+                                    customerOrder.ShipToAddress1 = shipToAddress1;
+                                    customerOrder.ShipToAddress2 = shipToAddress2;
+                                    customerOrder.ShipToAddress3 = shipToAddress3;
+                                    customerOrder.ShipToState = shipToState;
+                                    customerOrder.ShipToGstin = shipToGstin;
+                                    customerOrder.ImportedOn = DateTime.Now;
+                                    customerOrder.IsConfirmed = false;
+                                    customerOrder.IsPosted = false;
+                                    customerOrder.PostedOn = new DateTime(2000, 01, 01);
+                                    customerOrder.RetryCount = 0;
+                                    customerOrder.TallyCompanyId = tallyCompanyId;
+                                    #endregion
+
+                                    #region Add and Updating the Customer Order
+                                    if (checkingValueOfCustomerOrder == null)
+                                    {
+                                        uow.CustomerOrder.Add(customerOrder);
+                                        totalOrders++;
+                                    }
+                                    else
+                                    {
+                                        uow.CustomerOrder.Update(customerOrder);
+                                        totalOrders++;
+                                    }
+                                    #endregion
+
+                                    foreach (var itemLines in response["itemLines"]?.Children())
+                                    {
+                                        #region Reading Item Lines in Customer Order - API response
+                                        string itemId = CheckNullOrEmpty(itemLines["itemId"]?.ToString(), "itemId");
+                                        string itemName = CheckNullOrEmpty(itemLines["itemName"]?.ToString(), "itemName");
+                                        string qtyString = CheckNullOrEmpty(itemLines["qty"]?.ToString(), "qty");
+                                        decimal qty = string.IsNullOrEmpty(qtyString) ? 0 : Convert.ToDecimal(qtyString);
+                                        string rateString = CheckNullOrEmpty(itemLines["base_price"]?.ToString(), "base_price");
+                                        decimal rate = string.IsNullOrEmpty(rateString) ? 0 : Convert.ToDecimal(rateString);
+                                        string amountString = CheckNullOrEmpty(itemLines["amount"]?.ToString(), "amount");
+                                        decimal amount = string.IsNullOrEmpty(amountString) ? 0 : Convert.ToDecimal(amountString);
+                                        string date = CheckNullOrEmpty(itemLines["dueDate"]?.ToString(), "dueDate");
+                                        DateTime dueDate = string.IsNullOrEmpty(date) ? orderDate : HelperFunctions.ParseDateTime(date, (itemLines["dueDate"]?.ToString()), ApiType.getCustomerOrder.ToString());
+                                        #endregion
+
+                                        CustomerOrderItemLines itemLine = uow.CustomerOrderItemLines.GetList().Where(x => x.ItemId == itemId && x.CompanyId == companyId && x.OrderId == orderId).FirstOrDefault(); //Subhabrata 28-Sep-2021 : Filtering corrected
+                                        var checkingValueOfItemLine = itemLine;
+
+                                        #region Assigning Item line values to Database cloumns
+                                        itemLine = new CustomerOrderItemLines();
+                                        itemLine.ItemId = itemId;
+                                        itemLine.OrderId = orderId;
+                                        itemLine.ItemName = itemName;
+                                        itemLine.Qty = qty;
+                                        itemLine.Rate = rate;
+                                        itemLine.Amount = amount;
+                                        itemLine.DueDate = dueDate;
+                                        itemLine.CompanyId = companyId;
+                                        #endregion
+
+                                        #region Add and Update Item line according to the Customer Order
+                                        if (checkingValueOfItemLine == null)
+                                        {
+                                            uow.CustomerOrderItemLines.Add(itemLine);
+                                        }
+                                        else
+                                        {
+                                            uow.CustomerOrderItemLines.Update(itemLine);
+                                        }
+                                        #endregion
+                                    }
+
+
+                                }
+
+                                SaveSyncStatusInDb(uow, syncStatusForSalesOrder, SyncStatusCondition.SalesOrderSyncEnded);
+                            }
+                            else
+                            {
+                                ErrorLogger.LogError(_logger, "Get Customer Order", "ApiHelper|" + Session.UserName + "|No response received from Customer Order (GET) API" + "^");
+                                SaveSyncStatusInDb(uow, syncStatusForSalesOrder, SyncStatusCondition.ApiErrorForSalesOrder);
+                                _salesOrderLogger.Info("ApiHelper|" + Session.UserName + "|No response received from Customer Order (GET) API" + "^");
+                                _salesOrderLogger.Info("");
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            _logger.Info("ApiHelper|" + Session.UserName + "|Customer Order GET request unsuccessful" + "^");
+                            _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                            return false;
+                        }
+                    }
+                    #region Logging About API Call and Customer Order Syncing 
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Customer Order GET response processed successfully. Total orders received: " + totalOrders + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+
+                    _appLogger.Info("ApiHelper|" + Session.UserName + "|Customer Order GET response processed successfully. Total orders received: " + totalOrders + "^");
+                    _appLogger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                    return true;
+                    #endregion  
+                }
+
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                return false;
+            }
+        }
+
+        public static bool GetSettings()
+        {
+            try
+            {
+                _logger.Info("ApiHelper|" + Session.UserName + "|Begin api call for get settings for url - " + Session.BaseUrl + ApiType.tally + "/" + ApiType.setting.ToString() + "^");
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+
+                _logger.Info("ApiHelper|" + Session.UserName + "|Get Settings started..." + "^");
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                ApiResponse apiResponse = new ApiResponse();
+                apiResponse = RestUtility.GetData(null, Session.BaseUrl + ApiType.tally + "/" + ApiType.setting.ToString(), Utils.Enum.RequestType.GetSettings);
+
+                if (CheckLoginError(apiResponse))
+                {
+                    Relogin();
+                    apiResponse = RestUtility.GetData(null, Session.BaseUrl + ApiType.tally + "/" + ApiType.setting.ToString(), Utils.Enum.RequestType.GetSettings);
+                }
+
+                if (apiResponse.ResponseCode != "200" && apiResponse.ResponseCode != "Created" && apiResponse.ResponseCode != "OK")
+                {
+                    return false;
+                }
+                //JObject jTokenResponse = JObject.Parse(apiResponse.Response);
+                string response = apiResponse.Response;
+                var responseStatus = JObject.Parse(response)["status"].ToString();
+                JToken jToken = JObject.Parse(response)["data"]?.ToString();
+
+                if (responseStatus == "success" && jToken != null)
+                {
+                    JObject objData = (JObject)JObject.Parse(response)["data"];//Main Parent                    
+
+                    #region Reading Child Object of Data
+
+                    string tallyIp = objData["TALLY_IP"]?.ToString();
+                    string tallyPort = objData["TALLY_PORT"]?.ToString();
+                    string frequency = objData["FREQUENCY"]?.ToString();
+                    string productFilter = objData["PRODUCT_FILTER"]?.ToString();
+
+                    #endregion
+
+                    var workflowObject = objData["WORKFLOW"];//Child of Data
+
+                    #region Reading Child Object of Workflow
+
+                    string post_Sku = workflowObject["POST_SKU"]?.ToString();
+                    string post_Customer = workflowObject["POST_CUSTOMER"]?.ToString();
+                    string post_Invoice = workflowObject["POST_INVOICE"].ToString();
+                    string get_Order = workflowObject["GET_ORDER"]?.ToString();
+                    string get_Payment = workflowObject["GET_PAYMENT"]?.ToString();
+                    string post_Outstanding = workflowObject["POST_OUTSTANDING"]?.ToString();
+                    string post_Stock = workflowObject["POST_STOCK"]?.ToString();
+
+                    #endregion
+
+                    #region Saving Settings value in Settings Table - Beatroute SQLLite Database
+
+                    GetSettingsApiDataSavingProcessInSettingsTable("IP", tallyIp);
+                    GetSettingsApiDataSavingProcessInSettingsTable("PORT", tallyPort);
+                    GetSettingsApiDataSavingProcessInSettingsTable("FREQUENCY", frequency);
+                    GetSettingsApiDataSavingProcessInSettingsTable("PRODUCT_FILTER", productFilter);
+
+                    #endregion
+
+                    #region Saving the Workflow values in Company Table - Beatroute SQLLite Database
+
+                    GetSettingsApiDataSavingProcessInSettingsTable("POST_SKU", post_Sku);
+                    GetSettingsApiDataSavingProcessInSettingsTable("POST_CUSTOMER", post_Customer);
+                    GetSettingsApiDataSavingProcessInSettingsTable("POST_INVOICE", post_Invoice);
+                    GetSettingsApiDataSavingProcessInSettingsTable("GET_ORDER", get_Order);
+                    GetSettingsApiDataSavingProcessInSettingsTable("GET_PAYMENT", get_Payment);
+                    GetSettingsApiDataSavingProcessInSettingsTable("POST_OUTSTANDING", post_Outstanding);
+                    GetSettingsApiDataSavingProcessInSettingsTable("POST_STOCK", post_Stock);
+
+                    #endregion
+
+                    _logger.Info("ApiHelper|" + Session.UserName + "|Get settings completed successfully" + "^");
+                    _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                    return true;
+                }
+                _logger.Info("ApiHelper|" + Session.UserName + "|Get settings failed" + "^");
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                throw;
+
+            }
+        }
+        #endregion
+
+        #region Methods
+        private static string CheckErrors(JToken responseToken)
+        {
+            if (responseToken["status"].ToString().ToUpper() == "FAIL" || responseToken["status"].ToString() == "Validation Fail")
+            {
+                if (responseToken["statuscode"].ToString() == null)
+                {
+                    return responseToken["status"].ToString() + "\r\n" + responseToken["code"].ToString() + "\r\n" + responseToken["messagetype"].ToString() + "\r\n" + responseToken["messagetext"].ToString() + "\r\n" + responseToken["details"].ToString();
+                }
+                else
+                {
+                    return responseToken["details"].ToString();
+                }
+            }
+
+            return responseToken["status"].ToString();
+        }
+        private static void Relogin()
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    Login user = uow.Login.GetList().FirstOrDefault();
+                    if (user != null)
+                    {
+                        bool login = RestUtility.GetToken(user.UserName, StringFunctions.Decrypt(user.Password), Session.BaseUrl + ApiType.login.ToString());
+                        if (login)
+                        {
+                            _logger.Info("ApiHelper|" + Session.UserName + "|User: " + user.UserName + " token is refreshed successfully" + "^");
+                            _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                        }
+                        else
+                        {
+                            ErrorLogger.LogError(_logger, "Login", "ApiHelper|" + Session.UserName + "|Relogging failed for user: " + user.UserName + "^");
+                        }
+                    }
+                    else
+                    {
+                        _logger.Error("ApiHelper|" + Session.UserName + "|No default user found to relogin" + "^");
+                        _logger.Error("ApiHelper|" + Session.UserName + "|" + "^");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+            }
+        }
+        private static bool CheckLoginError(ApiResponse apiResponse)
+        {
+            if (apiResponse.ResponseCode == "ProtocolError" && apiResponse.ExceptionMessage.Contains("(401) Unauthorized."))
+                return true;
+            else
+                return false;
+        }
+        private static void LogInvalidResponse(JToken jTokenResponse, ApiResponse apiResponse)
+        {
+            JObject responseObject = JObject.Parse(apiResponse.Response);
+            if (responseObject["code"]?.ToString() == "401 UNAUTHORIZED"
+                && responseObject["messagetext"]?.ToString() == "Either token or request is invalid.")
+            {
+                Session.IsTokenError = true;
+                //RK 02-May-2021 If there is a token error then we will do a relogin to get a new token
+                //Relogin();                   
+                ErrorLogger.LogError(_logger, "Login Response", "ApiHelper|" + Session.UserName + "|Token expired. Relogging user" + "^");
+            }
+        }
+        private static bool CheckSuccess(string value, string key)
+        {
+            string successMsg = CheckNullOrEmpty(value, key);
+            if (!string.IsNullOrEmpty(successMsg) && successMsg.ToLower() == "success")
+                return true;
+            else
+                return false;
+        }
+        private static string CheckNullOrEmpty(string value, string key)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + key + " is missing or null in the Api response." + "^");
+                _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                _missingfields.Add(key);
+                return string.Empty;
+            }
+            else
+                return value;
+        }
+        private static void GetSettingsApiDataSavingProcessInSettingsTable(string key, string value)
+        {
+            using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+            {
+                Settings settings = uow.Settings.GetList().Where(x => x.Key == key).FirstOrDefault();
+                if (settings == null)
+                {
+                    settings = new Settings();
+                    settings.Key = key;
+                    settings.Value = value;
+                    uow.Settings.Add(settings);
+                }
+                else
+                {
+                    settings.Value = value;
+                    uow.Settings.Update(settings);
+                }
+            }
+        }
+
+        private static SyncStatus GetSyncStatusObject(UnitOfWork uow, string ledgerKey)
+        {
+            var syncStatusObject = uow.SyncStatus.GetList().Where(x => x.LedgerKey == ledgerKey).FirstOrDefault();
+            return syncStatusObject;
+        }
+
+        private static void SaveSyncStatusInDb(UnitOfWork uow, SyncStatus syncStatus, SyncStatusCondition syncStatusCondition)
+        {
+            switch (syncStatusCondition)
+            {
+                case SyncStatusCondition.PostStarting:
+                    if (syncStatus != null)
+                    {
+                        syncStatus.LedgerValue = SyncStatusTextMessageHelper.TallyDataPostProgress;
+                        syncStatus.LedgerErrorStatus = "";
+                        uow.SyncStatus.Update(syncStatus);
+                    }
+                    break;
+                case SyncStatusCondition.ApiErrorForOthers:
+                    if (syncStatus != null)
+                    {
+                        _errorCount++;
+                        syncStatus.LedgerValue = SyncStatusTextMessageHelper.TallyDataPostWithError;
+                        if (_errorCount > 1)
+                        {
+                            syncStatus.LedgerErrorStatus = _errorCount + SyncStatusTextMessageHelper.PluralErrorText;
+                        }
+                        else
+                            syncStatus.LedgerErrorStatus = _errorCount + SyncStatusTextMessageHelper.SingularErrorText;
+
+                        uow.SyncStatus.Update(syncStatus);
+                    }
+                    break;
+                case SyncStatusCondition.PostEnded:
+                    if (syncStatus != null)
+                    {
+                        syncStatus.LedgerValue = SyncStatusTextMessageHelper.TallyDataPostWithoutError;
+                        syncStatus.LedgerErrorStatus = "";
+                        uow.SyncStatus.Update(syncStatus);
+                    }
+                    break;
+                case SyncStatusCondition.SalesOrderSyncStarting:
+                    if(syncStatus != null)
+                    {
+                        syncStatus.LedgerValue = SyncStatusTextMessageHelper.SalesOrderSyncProgress;
+                        syncStatus.LedgerErrorStatus = "";
+                        uow.SyncStatus.Update(syncStatus);
+                    }
+                    break;
+                case SyncStatusCondition.ApiErrorForSalesOrder:
+                    if (syncStatus != null)
+                    {
+                        syncStatus.LedgerValue = SyncStatusTextMessageHelper.SalesOrderSyncWithError;
+                        if (_errorCount > 1)
+                        {
+                            syncStatus.LedgerErrorStatus = _errorCount + SyncStatusTextMessageHelper.PluralErrorText;
+                        }
+                        else
+                            syncStatus.LedgerErrorStatus = _errorCount + SyncStatusTextMessageHelper.SingularErrorText;
+
+                        uow.SyncStatus.Update(syncStatus);
+                    }
+                    break;
+                case SyncStatusCondition.SalesOrderSyncEnded:
+                    if (syncStatus != null)
+                    {
+                        syncStatus.LedgerValue = SyncStatusTextMessageHelper.SalesOrderSyncWithoutError;
+                        syncStatus.LedgerErrorStatus = "";
+                        uow.SyncStatus.Update(syncStatus);
+                    }
+                    break;
+                default:
+                    break;
+
+            }
+        }
+
+        #endregion
+
+        #region Enums
+
+        private enum SyncStatusCondition
+        {
+            PostStarting,
+            PostEnded,
+            ApiErrorForOthers,
+            SalesOrderSyncStarting,
+            SalesOrderSyncEnded,
+            ApiErrorForSalesOrder
+        }
+
+        #endregion
+    }
+}

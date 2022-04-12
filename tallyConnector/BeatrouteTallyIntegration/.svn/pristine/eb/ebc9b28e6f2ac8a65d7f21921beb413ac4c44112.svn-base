@@ -1,0 +1,219 @@
+﻿namespace BeatrouteTallyIntegrationTest
+{
+    partial class TestForm
+    {
+        /// <summary>
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary>
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Windows Form Designer generated code
+
+        /// <summary>
+        /// Required method for Designer support - do not modify
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            this.cmbCompanyName = new System.Windows.Forms.ComboBox();
+            this.lblCompanyName = new System.Windows.Forms.Label();
+            this.dataGridView1 = new System.Windows.Forms.DataGridView();
+            this.btnAddCompany = new System.Windows.Forms.Button();
+            this.btnSalesInvoices = new System.Windows.Forms.Button();
+            this.btnAddItems = new System.Windows.Forms.Button();
+            this.btnAddCustomers = new System.Windows.Forms.Button();
+            this.btnStock = new System.Windows.Forms.Button();
+            this.btnGetApiTest = new System.Windows.Forms.Button();
+
+            this.btnTalltPostCustomerPayment = new System.Windows.Forms.Button();
+
+
+            this.btnPostToTally = new System.Windows.Forms.Button();
+
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
+            this.SuspendLayout();
+            // 
+            // cmbCompanyName
+            // 
+            this.cmbCompanyName.FormattingEnabled = true;
+            this.cmbCompanyName.Location = new System.Drawing.Point(144, 12);
+            this.cmbCompanyName.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            this.cmbCompanyName.Name = "cmbCompanyName";
+            this.cmbCompanyName.Size = new System.Drawing.Size(193, 24);
+            this.cmbCompanyName.TabIndex = 0;
+            // 
+            // lblCompanyName
+            // 
+            this.lblCompanyName.AutoSize = true;
+            this.lblCompanyName.Location = new System.Drawing.Point(29, 15);
+            this.lblCompanyName.Name = "lblCompanyName";
+            this.lblCompanyName.Size = new System.Drawing.Size(108, 17);
+            this.lblCompanyName.TabIndex = 1;
+            this.lblCompanyName.Text = "Company Name";
+            // 
+            // dataGridView1
+            // 
+            this.dataGridView1.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.dataGridView1.Location = new System.Drawing.Point(33, 42);
+            this.dataGridView1.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            this.dataGridView1.Name = "dataGridView1";
+            this.dataGridView1.RowHeadersWidth = 51;
+            this.dataGridView1.RowTemplate.Height = 24;
+            this.dataGridView1.Size = new System.Drawing.Size(981, 89);
+            this.dataGridView1.TabIndex = 2;
+            // 
+            // btnAddCompany
+            // 
+            this.btnAddCompany.Location = new System.Drawing.Point(887, 135);
+            this.btnAddCompany.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            this.btnAddCompany.Name = "btnAddCompany";
+            this.btnAddCompany.Size = new System.Drawing.Size(128, 23);
+            this.btnAddCompany.TabIndex = 3;
+            this.btnAddCompany.Text = "Add Company";
+            this.btnAddCompany.UseVisualStyleBackColor = true;
+            this.btnAddCompany.Click += new System.EventHandler(this.btnAddCompany_Click);
+            // 
+            // btnSalesInvoices
+            // 
+            this.btnSalesInvoices.Location = new System.Drawing.Point(388, 135);
+            this.btnSalesInvoices.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            this.btnSalesInvoices.Name = "btnSalesInvoices";
+            this.btnSalesInvoices.Size = new System.Drawing.Size(157, 23);
+            this.btnSalesInvoices.TabIndex = 5;
+            this.btnSalesInvoices.Text = "Add Sales Invoices";
+            this.btnSalesInvoices.UseVisualStyleBackColor = true;
+            this.btnSalesInvoices.Click += new System.EventHandler(this.btnSalesInvoices_Click);
+            // 
+            // btnAddItems
+            // 
+            this.btnAddItems.Location = new System.Drawing.Point(281, 135);
+            this.btnAddItems.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            this.btnAddItems.Name = "btnAddItems";
+            this.btnAddItems.Size = new System.Drawing.Size(101, 23);
+            this.btnAddItems.TabIndex = 8;
+            this.btnAddItems.Text = "Add Items";
+            this.btnAddItems.UseVisualStyleBackColor = true;
+            this.btnAddItems.Click += new System.EventHandler(this.btnAddItems_Click);
+            // 
+            // btnAddCustomers
+            // 
+            this.btnAddCustomers.Location = new System.Drawing.Point(33, 135);
+            this.btnAddCustomers.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            this.btnAddCustomers.Name = "btnAddCustomers";
+            this.btnAddCustomers.Size = new System.Drawing.Size(123, 23);
+            this.btnAddCustomers.TabIndex = 10;
+            this.btnAddCustomers.Text = "Add Customers";
+            this.btnAddCustomers.UseVisualStyleBackColor = true;
+            this.btnAddCustomers.Click += new System.EventHandler(this.btnAddCustomers_Click);
+            // 
+            // btnStock
+            // 
+            this.btnStock.Location = new System.Drawing.Point(162, 135);
+            this.btnStock.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            this.btnStock.Name = "btnStock";
+            this.btnStock.Size = new System.Drawing.Size(113, 23);
+            this.btnStock.TabIndex = 11;
+            this.btnStock.Text = "Add Stock";
+            this.btnStock.UseVisualStyleBackColor = true;
+            this.btnStock.Click += new System.EventHandler(this.btnStock_Click);
+            // 
+            // btnGetApiTest
+            // 
+            this.btnGetApiTest.Location = new System.Drawing.Point(888, 162);
+            this.btnGetApiTest.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            this.btnGetApiTest.Name = "btnGetApiTest";
+            this.btnGetApiTest.Size = new System.Drawing.Size(128, 23);
+            this.btnGetApiTest.TabIndex = 12;
+            this.btnGetApiTest.Text = "GetApiTest";
+            this.btnGetApiTest.UseVisualStyleBackColor = true;
+            this.btnGetApiTest.Click += new System.EventHandler(this.btnGetApiTest_Click);
+            // 
+
+            // btnTalltPostCustomerPayment
+            // 
+            this.btnTalltPostCustomerPayment.Location = new System.Drawing.Point(575, 135);
+            this.btnTalltPostCustomerPayment.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            this.btnTalltPostCustomerPayment.Name = "btnTalltPostCustomerPayment";
+            this.btnTalltPostCustomerPayment.Size = new System.Drawing.Size(157, 23);
+            this.btnTalltPostCustomerPayment.TabIndex = 13;
+            this.btnTalltPostCustomerPayment.Text = " Customer Payment";
+            this.btnTalltPostCustomerPayment.UseVisualStyleBackColor = true;
+            this.btnTalltPostCustomerPayment.Click += new System.EventHandler(this.btnTalltPostCustomerPayment_Click);
+            // 
+
+
+            // btnPostToTally
+            // 
+            this.btnPostToTally.Location = new System.Drawing.Point(754, 162);
+            this.btnPostToTally.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            this.btnPostToTally.Name = "btnPostToTally";
+            this.btnPostToTally.Size = new System.Drawing.Size(128, 23);
+            this.btnPostToTally.TabIndex = 13;
+            this.btnPostToTally.Text = "PostToTally";
+            this.btnPostToTally.UseVisualStyleBackColor = true;
+            this.btnPostToTally.Click += new System.EventHandler(this.btnPostToTally_Click);
+            // 
+
+            // TestForm
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.ClientSize = new System.Drawing.Size(1028, 196);
+
+            this.Controls.Add(this.btnTalltPostCustomerPayment);
+
+
+            this.Controls.Add(this.btnPostToTally);
+
+            this.Controls.Add(this.btnGetApiTest);
+            this.Controls.Add(this.btnStock);
+            this.Controls.Add(this.btnAddCustomers);
+            this.Controls.Add(this.btnAddItems);
+            this.Controls.Add(this.btnSalesInvoices);
+            this.Controls.Add(this.btnAddCompany);
+            this.Controls.Add(this.dataGridView1);
+            this.Controls.Add(this.lblCompanyName);
+            this.Controls.Add(this.cmbCompanyName);
+            this.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            this.Name = "TestForm";
+            this.Text = "Form1";
+            this.Load += new System.EventHandler(this.TestForm_Load);
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();
+            this.ResumeLayout(false);
+            this.PerformLayout();
+
+        }
+
+        #endregion
+
+        private System.Windows.Forms.ComboBox cmbCompanyName;
+        private System.Windows.Forms.Label lblCompanyName;
+        private System.Windows.Forms.DataGridView dataGridView1;
+        private System.Windows.Forms.Button btnAddCompany;
+        private System.Windows.Forms.Button btnSalesInvoices;
+        private System.Windows.Forms.Button btnAddItems;
+        private System.Windows.Forms.Button btnAddCustomers;
+        private System.Windows.Forms.Button btnStock;
+        private System.Windows.Forms.Button btnGetApiTest;
+
+        private System.Windows.Forms.Button btnTalltPostCustomerPayment;
+
+
+        private System.Windows.Forms.Button btnPostToTally;
+
+    }
+}
+

@@ -1,0 +1,19 @@
+﻿using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.Models
+{
+    [ModelAttributes(Key = "Id", TableName = "BillReferences")]
+    public class BillReferences
+    {
+        public Guid Id { get; set; }
+        public string CompanyId { get; set; }
+        public string CustomerPaymentId { get; set; }
+        public string BillReferenceNo { get; set; }
+        public decimal BillReferenceAmount { get; set; }
+    }
+}

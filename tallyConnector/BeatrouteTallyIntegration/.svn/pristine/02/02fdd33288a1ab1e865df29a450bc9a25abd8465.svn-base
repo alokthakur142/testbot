@@ -1,0 +1,18 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationBase.Helpers
+{
+    public class SendLogHelper
+    {
+        public DateTime TimeStamp { get; set; }
+        public string TypeOfLog { get; set; }
+        public string SourceOfLog { get; set; }
+        public string Functionality { get; set; }
+        public string UserName { get; set; }
+        public string Message { get; set; }
+    }
+}

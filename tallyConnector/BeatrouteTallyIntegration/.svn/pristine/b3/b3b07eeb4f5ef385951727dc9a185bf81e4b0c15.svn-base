@@ -1,0 +1,60 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31112.23
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BeatrouteTallyIntegrationBase", "BeatrouteTallyIntegrationBase\BeatrouteTallyIntegrationBase.csproj", "{063458C0-EC1B-4C29-8EC8-24F58E373B97}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BeatrouteTallyIntegrationDAL", "BeatrouteTallyIntegrationDAL\BeatrouteTallyIntegrationDAL.csproj", "{EE182274-2553-4D84-819C-032B529EA579}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BeatrouteTallyIntegration", "BeatrouteTallyIntegration\BeatrouteTallyIntegration.csproj", "{DB9BAAFB-C514-4D5F-AA69-7DEA742A70A3}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DFF4F929-3E3E-4069-9396-5B2F5CF62EFC} = {DFF4F929-3E3E-4069-9396-5B2F5CF62EFC}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BeatrouteTallyIntegrationTest", "BeatrouteTallyIntegrationTest\BeatrouteTallyIntegrationTest.csproj", "{6D1EE0AC-A3FB-4AF1-B8F6-F53512493B95}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Updater", "Updater\Updater.csproj", "{DFF4F929-3E3E-4069-9396-5B2F5CF62EFC}"
+EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "Beatroute_Tally_Connector_Setup", "Beatroute_Tally_Connector_Setup\Beatroute_Tally_Connector_Setup.vdproj", "{81837B5D-ED9B-490B-BDBC-09589C114792}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{063458C0-EC1B-4C29-8EC8-24F58E373B97}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{063458C0-EC1B-4C29-8EC8-24F58E373B97}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{063458C0-EC1B-4C29-8EC8-24F58E373B97}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{063458C0-EC1B-4C29-8EC8-24F58E373B97}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EE182274-2553-4D84-819C-032B529EA579}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EE182274-2553-4D84-819C-032B529EA579}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EE182274-2553-4D84-819C-032B529EA579}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EE182274-2553-4D84-819C-032B529EA579}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DB9BAAFB-C514-4D5F-AA69-7DEA742A70A3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DB9BAAFB-C514-4D5F-AA69-7DEA742A70A3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DB9BAAFB-C514-4D5F-AA69-7DEA742A70A3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DB9BAAFB-C514-4D5F-AA69-7DEA742A70A3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6D1EE0AC-A3FB-4AF1-B8F6-F53512493B95}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6D1EE0AC-A3FB-4AF1-B8F6-F53512493B95}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6D1EE0AC-A3FB-4AF1-B8F6-F53512493B95}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6D1EE0AC-A3FB-4AF1-B8F6-F53512493B95}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DFF4F929-3E3E-4069-9396-5B2F5CF62EFC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DFF4F929-3E3E-4069-9396-5B2F5CF62EFC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DFF4F929-3E3E-4069-9396-5B2F5CF62EFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DFF4F929-3E3E-4069-9396-5B2F5CF62EFC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{81837B5D-ED9B-490B-BDBC-09589C114792}.Debug|Any CPU.ActiveCfg = Debug
+		{81837B5D-ED9B-490B-BDBC-09589C114792}.Release|Any CPU.ActiveCfg = Release
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {32C8B5D1-17D6-46DF-AC3F-92C04604886D}
+	EndGlobalSection
+	GlobalSection(SubversionScc) = preSolution
+		Svn-Managed = True
+		Manager = AnkhSVN2019 - Subversion Support for Visual Studio
+	EndGlobalSection
+EndGlobal

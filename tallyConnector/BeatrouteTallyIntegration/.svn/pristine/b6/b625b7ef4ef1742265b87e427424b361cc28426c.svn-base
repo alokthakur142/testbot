@@ -1,0 +1,93 @@
+﻿using NLog;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationBase.Common
+{
+    public static class Session
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+        public static string Token { get; set; }
+        public const string ApplicationName = "invoicemanager";
+        public static bool IsTokenError { get; set; }
+        public static string TallyIp { get; set; }
+        public static string TallyPort { get; set; }
+        public static string ConnectionString { get; set; }
+        public static int SyncFrequency { get; set; }
+        public static bool IsCompanyOpen { get; set; }
+        public static bool ProductMaster { get; set; }
+        public static bool CustomerMaster { get; set; }
+        public static bool CustomerInvoice { get; set; }
+        public static bool CustomerOrder { get; set; }
+        public static bool CustomerOutstanding { get; set; }
+        public static bool CustomerPayment { get; set; }
+        public static bool Stock { get; set; }
+        public static string ProductFilter { get; set; }
+        public static string SALT = "BR@2021$";
+        public const string TRACKER_SALT = "OTC-ti-72";
+        public static string BaseUrl { get; set; }
+        public static bool TallyIsEducational { get; set; }
+        public static bool IsTallyOpen { get; set; }
+        public static string UserName { get; set; }       
+        public static string VersionNo { get; set; }
+
+        public const string Key = "#BeatRouteTallyIntegration@2021$";
+        public const string IV = "%EasyReports2021";
+        public const string LogsUrl = "https://log-api.newrelic.com/log/v1?Api-Key=a32b30c7b041f4833d380683c53a17b0FFFFNRAL";
+        public static string GetBaseUrl()
+        {
+            try
+            {
+                string baseUrl = string.Empty;
+                string dbPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\BeatrouteTallyIntegration\\Database";
+                if (Directory.Exists(dbPath))
+                {
+                    string baseUrlPath = Path.Combine(dbPath, "BaseUrl", "BaseUrl.txt");
+                    baseUrl = File.ReadAllText(baseUrlPath);
+                }
+
+
+                return baseUrl.Trim();
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex );
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|");
+                return string.Empty;
+            }
+        }
+
+        public static void SetBaseUrl(string text)
+        {
+            try
+            {
+                string dbPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\BeatrouteTallyIntegration\\Database";
+                if (Directory.Exists(dbPath))
+                {
+                    string baseUrlPath = Path.Combine(dbPath, "BaseUrl", "BaseUrl.txt");
+                    if (File.Exists(baseUrlPath))
+                        File.Delete(baseUrlPath);
+
+                    using (StreamWriter sw = File.CreateText(baseUrlPath))
+                    {
+                        sw.WriteLine(text);
+                    }
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Base url set to: " + text );
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|");
+
+                    Session.BaseUrl = text;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex );
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|");
+            }
+        }
+    }
+}

@@ -1,0 +1,98 @@
+﻿using BeatrouteTallyIntegration.Utils;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationBase.Import;
+using BeatrouteTallyIntegrationBase.Tally;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace BeatrouteTallyIntegration.Forms
+{
+    public partial class frmAddCompany : Form
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+
+        public frmAddCompany()
+        {
+            InitializeComponent();
+        }
+
+        private void frmAddCompany_Load(object sender, EventArgs e)
+        {
+            try
+            {
+                TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+                _logger.Debug("ImportWorker|" + Session.UserName + "|IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                //string msg = string.Empty;
+                if (!tallyConn.IsTallyOpen())
+                {
+                    
+                        //MessagePopup.ShowError("Tally is not open for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort);
+                        ErrorLogger.LogError(_logger, "Company", "ImportWorker|" + Session.UserName + "|Tally not open for the given IP and Port. Please check Tally configuration and refresh." + "^");
+                        this.Close();
+                    
+                }
+                string[] companies = tallyConn.GetCompaniesOpenInTally();
+                cmbCompanies.Items.Clear();
+
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    var companyList = uow.Company.GetList();
+                    foreach (string company in companies)
+                    {
+                        if (string.IsNullOrEmpty(company))
+                            continue;
+                        if (companyList.Where(x => x.CompanyName == company).Count() == 1)
+                            continue;
+                        cmbCompanies.Items.Add(company);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+
+        private void btnSave_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(cmbCompanies.SelectedItem?.ToString()))
+                {
+                    MessageBox.Show("Please select a company", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                ImportController ic = new ImportController();
+                ic.GetCompanyDetails(cmbCompanies.SelectedItem?.ToString());
+                this.Close();
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("is not open for IP") || ex.Message.Contains("Tally is running in education mode"))
+                {
+                    MessagePopup.ShowWarning(ex.Message); 
+                }
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+
+        private void btnCancel_Click(object sender, EventArgs e)
+        {
+            DialogResult dr = MessageBox.Show("Do you want to cancel?", "Question", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (dr == DialogResult.Yes)
+                this.Close();
+        }
+    }
+}

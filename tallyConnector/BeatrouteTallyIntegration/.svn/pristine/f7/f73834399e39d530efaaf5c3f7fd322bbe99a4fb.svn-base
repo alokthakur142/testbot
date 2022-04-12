@@ -1,0 +1,39 @@
+﻿using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.Models
+{
+    [ModelAttributes(Key = "Id", TableName = "Stock")]
+    public class Stock
+    {
+        public Guid Id { get; set; }
+
+        public DateTime Timestamp { get; set; }
+
+        public string CompanyId { get; set; }
+
+        public string ItemId { get; set; }
+
+        public string Godown { get; set; }
+
+        public decimal Qty { get; set; }
+
+        public decimal Amount { get; set; }
+
+        public bool IsDeleted { get; set; }
+
+        public bool IsPosted { get; set; }
+
+        public decimal RetryCount { get; set; }
+
+        public string PostingMessage { get; set; }
+
+        public DateTime PostedOn { get; set; }
+
+        public DateTime ImportedOn { get; set; }
+    }
+}

@@ -1,0 +1,155 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{063458C0-EC1B-4C29-8EC8-24F58E373B97}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>BeatrouteTallyIntegrationBase</RootNamespace>
+    <AssemblyName>BeatrouteTallyIntegrationBase</AssemblyName>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ContentSQLiteInteropFiles>true</ContentSQLiteInteropFiles>
+    <CopySQLiteInteropFiles>false</CopySQLiteInteropFiles>
+    <CleanSQLiteInteropFiles>false</CleanSQLiteInteropFiles>
+    <CollectSQLiteInteropFiles>false</CollectSQLiteInteropFiles>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ContentSQLiteInteropFiles>true</ContentSQLiteInteropFiles>
+    <CopySQLiteInteropFiles>false</CopySQLiteInteropFiles>
+    <CleanSQLiteInteropFiles>false</CleanSQLiteInteropFiles>
+    <CollectSQLiteInteropFiles>false</CollectSQLiteInteropFiles>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.13.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
+      <HintPath>..\packages\NLog.4.7.9\lib\net45\NLog.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="OrchidConnector, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>Dlls\OrchidConnector.dll</HintPath>
+    </Reference>
+    <Reference Include="OrchidDALBase, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>Dlls\OrchidDALBase.dll</HintPath>
+    </Reference>
+    <Reference Include="OrchidData, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>Dlls\OrchidData.dll</HintPath>
+    </Reference>
+    <Reference Include="PresentationFramework" />
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Transactions" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+    <Reference Include="WindowsBase" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="API\ApiResponse.cs" />
+    <Compile Include="API\customerOrder.cs" />
+    <Compile Include="API\customerOrderPost.cs" />
+    <Compile Include="API\customerOutstanding.cs" />
+    <Compile Include="API\customerPayment.cs" />
+    <Compile Include="API\customerPaymentPostingConfirmation.cs" />
+    <Compile Include="API\customerPostedPayment.cs" />
+    <Compile Include="API\customers.cs" />
+    <Compile Include="API\items.cs" />
+    <Compile Include="API\login.cs" />
+    <Compile Include="API\logs.cs" />
+    <Compile Include="API\orderStatus.cs" />
+    <Compile Include="API\pagination.cs" />
+    <Compile Include="API\RestUtility.cs" />
+    <Compile Include="API\salesInvoice.cs" />
+    <Compile Include="API\settings.cs" />
+    <Compile Include="API\stock.cs" />
+    <Compile Include="API\refreshTokenApi.cs" />
+    <Compile Include="Class1.cs" />
+    <Compile Include="Common\Constants.cs" />
+    <Compile Include="Common\DbVersion.cs" />
+    <Compile Include="Common\Enum.cs" />
+    <Compile Include="Common\ErrorLogger.cs" />
+    <Compile Include="Common\ReconcileMaster.cs" />
+    <Compile Include="Common\Session.cs" />
+    <Compile Include="Common\StringFunctions.cs" />
+    <Compile Include="Export\ExportController.cs" />
+    <Compile Include="Helpers\HelperFunctions.cs" />
+    <Compile Include="Helpers\PostTallyData.cs" />
+    <Compile Include="Helpers\SendLogHelper.cs" />
+    <Compile Include="Helpers\SyncStatusTextMessageHelper.cs" />
+    <Compile Include="Helpers\SyncTallyData.cs" />
+    <Compile Include="Import\ImportController.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Tally\TallyConnector.cs" />
+    <Compile Include="Tally\TallyUtil.cs" />
+    <Compile Include="Utils\ApiHelper.cs" />
+    <Compile Include="Utils\Helpers.cs" />
+    <Compile Include="Utils\OSInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Dlls\OrchidConnector.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dlls\OrchidDALBase.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dlls\OrchidData.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="NLog.config" />
+    <None Include="NLog.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BeatrouteTallyIntegrationDAL\BeatrouteTallyIntegrationDAL.csproj">
+      <Project>{EE182274-2553-4D84-819C-032B529EA579}</Project>
+      <Name>BeatrouteTallyIntegrationDAL</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

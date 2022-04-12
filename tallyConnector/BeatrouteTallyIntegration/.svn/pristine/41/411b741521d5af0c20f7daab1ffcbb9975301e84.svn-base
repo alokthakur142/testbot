@@ -1,0 +1,53 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationBase.API
+{
+    public class customerOrder
+    {
+        public customerOrder()
+        {
+            itemLinesList = new List<itemLines>();
+        }
+
+        public string orderId { get; set; }
+        public string companyId { get; set; }
+        public string orderNo { get; set; }
+        public string orderDate { get; set; }
+        public string customerId { get; set; }
+        public string customerName { get; set; }
+        public string termsOfPayment { get; set; }
+        public string otherReference { get; set; }
+        public string termsOfDelivery { get; set; }
+        public string despatchThrough { get; set; }
+        public string destination { get; set; }
+        public string buyerCustomerName { get; set; }
+        public string buyerAddress1 { get; set; }
+        public string buyerAddress2 { get; set; }
+        public string buyerAddress3 { get; set; }
+        public string buyerState { get; set; }
+        public string buyerGstin { get; set; }
+        public string shipToCustomerName { get; set; }
+        public string shipToCustomerAddress1 { get; set; }
+        public string shipToCustomerAddress2 { get; set; }
+        public string shipToCustomerAddress3 { get; set; }
+        public string shipToState { get; set; }
+        public string shipToGstin { get; set; }
+        public string narration { get; set; }
+
+        public List<itemLines> itemLinesList;
+    }
+
+    public class itemLines
+    {
+        public string itemId { get; set; }
+        public string itemName { get; set; }
+        public string qty { get; set; }
+        public string rate { get; set; }
+        public string amount { get; set; }
+        public string dueDate { get; set; }
+    }
+}

@@ -1,0 +1,521 @@
+﻿namespace BeatrouteTallyIntegration.Controls
+{
+    partial class ctrlSyncStatus
+    {
+        /// <summary> 
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary> 
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Component Designer generated code
+
+        /// <summary> 
+        /// Required method for Designer support - do not modify 
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            this.components = new System.ComponentModel.Container();
+            this.lblControlTitle = new System.Windows.Forms.Label();
+            this.pnlSalesOrder = new System.Windows.Forms.Panel();
+            this.linkViewLogForSalesOrders = new System.Windows.Forms.LinkLabel();
+            this.lblSalesOrdersError = new System.Windows.Forms.Label();
+            this.lblSalesOrdersStatus = new System.Windows.Forms.Label();
+            this.lblSalesOrderDivider = new System.Windows.Forms.Label();
+            this.lblSalesOrderTitle = new System.Windows.Forms.Label();
+            this.pnlCustomer = new System.Windows.Forms.Panel();
+            this.linkViewLogForOutstandings = new System.Windows.Forms.LinkLabel();
+            this.lblOutstandingsError = new System.Windows.Forms.Label();
+            this.lblOutstandingsStatus = new System.Windows.Forms.Label();
+            this.lblCustomerDivider = new System.Windows.Forms.Label();
+            this.lblCustomerTitle = new System.Windows.Forms.Label();
+            this.pnlSKUs = new System.Windows.Forms.Panel();
+            this.linkViewLogForSKUs = new System.Windows.Forms.LinkLabel();
+            this.lblSKUsError = new System.Windows.Forms.Label();
+            this.lblSKUsStatus = new System.Windows.Forms.Label();
+            this.lblSKUsDivider = new System.Windows.Forms.Label();
+            this.lblSKUTitle = new System.Windows.Forms.Label();
+            this.pnlSalesInvoices = new System.Windows.Forms.Panel();
+            this.linkViewLogForSalesInvoices = new System.Windows.Forms.LinkLabel();
+            this.lblSalesInvoicesError = new System.Windows.Forms.Label();
+            this.lblSalesInvoicesStatus = new System.Windows.Forms.Label();
+            this.lblSalesInvoicesTitle = new System.Windows.Forms.Label();
+            this.lblSalesInvoicesDivider = new System.Windows.Forms.Label();
+            this.timerSyncStaus = new System.Windows.Forms.Timer(this.components);
+            this.panel1 = new System.Windows.Forms.Panel();
+            this.linkViewLogForStocks = new System.Windows.Forms.LinkLabel();
+            this.lblStocksError = new System.Windows.Forms.Label();
+            this.lblStocksStatus = new System.Windows.Forms.Label();
+            this.label3 = new System.Windows.Forms.Label();
+            this.lblStockTitle = new System.Windows.Forms.Label();
+            this.pnlSalesOrder.SuspendLayout();
+            this.pnlCustomer.SuspendLayout();
+            this.pnlSKUs.SuspendLayout();
+            this.pnlSalesInvoices.SuspendLayout();
+            this.panel1.SuspendLayout();
+            this.SuspendLayout();
+            // 
+            // lblControlTitle
+            // 
+            this.lblControlTitle.AutoSize = true;
+            this.lblControlTitle.Font = new System.Drawing.Font("Microsoft Sans Serif", 18F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblControlTitle.Location = new System.Drawing.Point(9, 9);
+            this.lblControlTitle.Name = "lblControlTitle";
+            this.lblControlTitle.Size = new System.Drawing.Size(276, 29);
+            this.lblControlTitle.TabIndex = 0;
+            this.lblControlTitle.Text = "Synchronization Status";
+            // 
+            // pnlSalesOrder
+            // 
+            this.pnlSalesOrder.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.pnlSalesOrder.Controls.Add(this.linkViewLogForSalesOrders);
+            this.pnlSalesOrder.Controls.Add(this.lblSalesOrdersError);
+            this.pnlSalesOrder.Controls.Add(this.lblSalesOrdersStatus);
+            this.pnlSalesOrder.Controls.Add(this.lblSalesOrderDivider);
+            this.pnlSalesOrder.Controls.Add(this.lblSalesOrderTitle);
+            this.pnlSalesOrder.Location = new System.Drawing.Point(20, 386);
+            this.pnlSalesOrder.Name = "pnlSalesOrder";
+            this.pnlSalesOrder.Size = new System.Drawing.Size(721, 70);
+            this.pnlSalesOrder.TabIndex = 11;
+            // 
+            // linkViewLogForSalesOrders
+            // 
+            this.linkViewLogForSalesOrders.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.linkViewLogForSalesOrders.AutoSize = true;
+            this.linkViewLogForSalesOrders.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.linkViewLogForSalesOrders.Location = new System.Drawing.Point(644, 40);
+            this.linkViewLogForSalesOrders.Name = "linkViewLogForSalesOrders";
+            this.linkViewLogForSalesOrders.Size = new System.Drawing.Size(54, 15);
+            this.linkViewLogForSalesOrders.TabIndex = 9;
+            this.linkViewLogForSalesOrders.TabStop = true;
+            this.linkViewLogForSalesOrders.Text = "ViewLog";
+            this.linkViewLogForSalesOrders.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.commonLinkLabel_LinkClicked);
+            // 
+            // lblSalesOrdersError
+            // 
+            this.lblSalesOrdersError.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.lblSalesOrdersError.AutoSize = true;
+            this.lblSalesOrdersError.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblSalesOrdersError.ForeColor = System.Drawing.Color.Red;
+            this.lblSalesOrdersError.Location = new System.Drawing.Point(569, 39);
+            this.lblSalesOrdersError.Name = "lblSalesOrdersError";
+            this.lblSalesOrdersError.Size = new System.Drawing.Size(42, 18);
+            this.lblSalesOrdersError.TabIndex = 8;
+            this.lblSalesOrdersError.Text = "Error";
+            // 
+            // lblSalesOrdersStatus
+            // 
+            this.lblSalesOrdersStatus.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)));
+            this.lblSalesOrdersStatus.AutoSize = true;
+            this.lblSalesOrdersStatus.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblSalesOrdersStatus.ForeColor = System.Drawing.Color.Black;
+            this.lblSalesOrdersStatus.Location = new System.Drawing.Point(248, 40);
+            this.lblSalesOrdersStatus.Name = "lblSalesOrdersStatus";
+            this.lblSalesOrdersStatus.Size = new System.Drawing.Size(63, 16);
+            this.lblSalesOrdersStatus.TabIndex = 7;
+            this.lblSalesOrdersStatus.Text = "Progress";
+            // 
+            // lblSalesOrderDivider
+            // 
+            this.lblSalesOrderDivider.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
+            this.lblSalesOrderDivider.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.lblSalesOrderDivider.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
+            this.lblSalesOrderDivider.Location = new System.Drawing.Point(0, 68);
+            this.lblSalesOrderDivider.Margin = new System.Windows.Forms.Padding(0);
+            this.lblSalesOrderDivider.Name = "lblSalesOrderDivider";
+            this.lblSalesOrderDivider.Size = new System.Drawing.Size(721, 2);
+            this.lblSalesOrderDivider.TabIndex = 6;
+            // 
+            // lblSalesOrderTitle
+            // 
+            this.lblSalesOrderTitle.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.lblSalesOrderTitle.AutoSize = true;
+            this.lblSalesOrderTitle.Font = new System.Drawing.Font("Century Gothic", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblSalesOrderTitle.ForeColor = System.Drawing.Color.Black;
+            this.lblSalesOrderTitle.Location = new System.Drawing.Point(3, 35);
+            this.lblSalesOrderTitle.Name = "lblSalesOrderTitle";
+            this.lblSalesOrderTitle.Size = new System.Drawing.Size(103, 21);
+            this.lblSalesOrderTitle.TabIndex = 5;
+            this.lblSalesOrderTitle.Text = "Sales Orders";
+            // 
+            // pnlCustomer
+            // 
+            this.pnlCustomer.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.pnlCustomer.Controls.Add(this.linkViewLogForOutstandings);
+            this.pnlCustomer.Controls.Add(this.lblOutstandingsError);
+            this.pnlCustomer.Controls.Add(this.lblOutstandingsStatus);
+            this.pnlCustomer.Controls.Add(this.lblCustomerDivider);
+            this.pnlCustomer.Controls.Add(this.lblCustomerTitle);
+            this.pnlCustomer.Location = new System.Drawing.Point(20, 83);
+            this.pnlCustomer.Name = "pnlCustomer";
+            this.pnlCustomer.Size = new System.Drawing.Size(721, 70);
+            this.pnlCustomer.TabIndex = 12;
+            // 
+            // linkViewLogForOutstandings
+            // 
+            this.linkViewLogForOutstandings.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.linkViewLogForOutstandings.AutoSize = true;
+            this.linkViewLogForOutstandings.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.linkViewLogForOutstandings.Location = new System.Drawing.Point(644, 40);
+            this.linkViewLogForOutstandings.Name = "linkViewLogForOutstandings";
+            this.linkViewLogForOutstandings.Size = new System.Drawing.Size(54, 15);
+            this.linkViewLogForOutstandings.TabIndex = 11;
+            this.linkViewLogForOutstandings.TabStop = true;
+            this.linkViewLogForOutstandings.Text = "ViewLog";
+            this.linkViewLogForOutstandings.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.commonLinkLabel_LinkClicked);
+            // 
+            // lblOutstandingsError
+            // 
+            this.lblOutstandingsError.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.lblOutstandingsError.AutoSize = true;
+            this.lblOutstandingsError.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblOutstandingsError.ForeColor = System.Drawing.Color.Red;
+            this.lblOutstandingsError.Location = new System.Drawing.Point(569, 39);
+            this.lblOutstandingsError.Name = "lblOutstandingsError";
+            this.lblOutstandingsError.Size = new System.Drawing.Size(42, 18);
+            this.lblOutstandingsError.TabIndex = 10;
+            this.lblOutstandingsError.Text = "Error";
+            // 
+            // lblOutstandingsStatus
+            // 
+            this.lblOutstandingsStatus.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)));
+            this.lblOutstandingsStatus.AutoSize = true;
+            this.lblOutstandingsStatus.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblOutstandingsStatus.ForeColor = System.Drawing.Color.Black;
+            this.lblOutstandingsStatus.Location = new System.Drawing.Point(248, 40);
+            this.lblOutstandingsStatus.Name = "lblOutstandingsStatus";
+            this.lblOutstandingsStatus.Size = new System.Drawing.Size(63, 16);
+            this.lblOutstandingsStatus.TabIndex = 9;
+            this.lblOutstandingsStatus.Text = "Progress";
+            // 
+            // lblCustomerDivider
+            // 
+            this.lblCustomerDivider.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
+            this.lblCustomerDivider.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.lblCustomerDivider.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
+            this.lblCustomerDivider.Location = new System.Drawing.Point(0, 68);
+            this.lblCustomerDivider.Margin = new System.Windows.Forms.Padding(0);
+            this.lblCustomerDivider.Name = "lblCustomerDivider";
+            this.lblCustomerDivider.Size = new System.Drawing.Size(721, 2);
+            this.lblCustomerDivider.TabIndex = 8;
+            // 
+            // lblCustomerTitle
+            // 
+            this.lblCustomerTitle.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.lblCustomerTitle.AutoSize = true;
+            this.lblCustomerTitle.Font = new System.Drawing.Font("Century Gothic", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblCustomerTitle.ForeColor = System.Drawing.Color.Black;
+            this.lblCustomerTitle.Location = new System.Drawing.Point(3, 35);
+            this.lblCustomerTitle.Name = "lblCustomerTitle";
+            this.lblCustomerTitle.Size = new System.Drawing.Size(186, 21);
+            this.lblCustomerTitle.TabIndex = 7;
+            this.lblCustomerTitle.Text = "Outstanding Summary";
+            // 
+            // pnlSKUs
+            // 
+            this.pnlSKUs.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.pnlSKUs.Controls.Add(this.linkViewLogForSKUs);
+            this.pnlSKUs.Controls.Add(this.lblSKUsError);
+            this.pnlSKUs.Controls.Add(this.lblSKUsStatus);
+            this.pnlSKUs.Controls.Add(this.lblSKUsDivider);
+            this.pnlSKUs.Controls.Add(this.lblSKUTitle);
+            this.pnlSKUs.Location = new System.Drawing.Point(20, 159);
+            this.pnlSKUs.Name = "pnlSKUs";
+            this.pnlSKUs.Size = new System.Drawing.Size(721, 70);
+            this.pnlSKUs.TabIndex = 13;
+            // 
+            // linkViewLogForSKUs
+            // 
+            this.linkViewLogForSKUs.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.linkViewLogForSKUs.AutoSize = true;
+            this.linkViewLogForSKUs.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.linkViewLogForSKUs.Location = new System.Drawing.Point(644, 40);
+            this.linkViewLogForSKUs.Name = "linkViewLogForSKUs";
+            this.linkViewLogForSKUs.Size = new System.Drawing.Size(54, 15);
+            this.linkViewLogForSKUs.TabIndex = 13;
+            this.linkViewLogForSKUs.TabStop = true;
+            this.linkViewLogForSKUs.Text = "ViewLog";
+            this.linkViewLogForSKUs.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.commonLinkLabel_LinkClicked);
+            // 
+            // lblSKUsError
+            // 
+            this.lblSKUsError.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.lblSKUsError.AutoSize = true;
+            this.lblSKUsError.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblSKUsError.ForeColor = System.Drawing.Color.Red;
+            this.lblSKUsError.Location = new System.Drawing.Point(569, 39);
+            this.lblSKUsError.Name = "lblSKUsError";
+            this.lblSKUsError.Size = new System.Drawing.Size(42, 18);
+            this.lblSKUsError.TabIndex = 12;
+            this.lblSKUsError.Text = "Error";
+            // 
+            // lblSKUsStatus
+            // 
+            this.lblSKUsStatus.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)));
+            this.lblSKUsStatus.AutoSize = true;
+            this.lblSKUsStatus.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblSKUsStatus.ForeColor = System.Drawing.Color.Black;
+            this.lblSKUsStatus.Location = new System.Drawing.Point(248, 40);
+            this.lblSKUsStatus.Name = "lblSKUsStatus";
+            this.lblSKUsStatus.Size = new System.Drawing.Size(63, 16);
+            this.lblSKUsStatus.TabIndex = 11;
+            this.lblSKUsStatus.Text = "Progress";
+            // 
+            // lblSKUsDivider
+            // 
+            this.lblSKUsDivider.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
+            this.lblSKUsDivider.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.lblSKUsDivider.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
+            this.lblSKUsDivider.Location = new System.Drawing.Point(0, 68);
+            this.lblSKUsDivider.Margin = new System.Windows.Forms.Padding(0);
+            this.lblSKUsDivider.Name = "lblSKUsDivider";
+            this.lblSKUsDivider.Size = new System.Drawing.Size(721, 2);
+            this.lblSKUsDivider.TabIndex = 10;
+            // 
+            // lblSKUTitle
+            // 
+            this.lblSKUTitle.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.lblSKUTitle.AutoSize = true;
+            this.lblSKUTitle.Font = new System.Drawing.Font("Century Gothic", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblSKUTitle.ForeColor = System.Drawing.Color.Black;
+            this.lblSKUTitle.Location = new System.Drawing.Point(3, 35);
+            this.lblSKUTitle.Name = "lblSKUTitle";
+            this.lblSKUTitle.Size = new System.Drawing.Size(44, 21);
+            this.lblSKUTitle.TabIndex = 9;
+            this.lblSKUTitle.Text = "SKUs";
+            // 
+            // pnlSalesInvoices
+            // 
+            this.pnlSalesInvoices.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.pnlSalesInvoices.Controls.Add(this.linkViewLogForSalesInvoices);
+            this.pnlSalesInvoices.Controls.Add(this.lblSalesInvoicesError);
+            this.pnlSalesInvoices.Controls.Add(this.lblSalesInvoicesStatus);
+            this.pnlSalesInvoices.Controls.Add(this.lblSalesInvoicesTitle);
+            this.pnlSalesInvoices.Controls.Add(this.lblSalesInvoicesDivider);
+            this.pnlSalesInvoices.Location = new System.Drawing.Point(20, 310);
+            this.pnlSalesInvoices.Name = "pnlSalesInvoices";
+            this.pnlSalesInvoices.Size = new System.Drawing.Size(721, 70);
+            this.pnlSalesInvoices.TabIndex = 14;
+            // 
+            // linkViewLogForSalesInvoices
+            // 
+            this.linkViewLogForSalesInvoices.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.linkViewLogForSalesInvoices.AutoSize = true;
+            this.linkViewLogForSalesInvoices.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.linkViewLogForSalesInvoices.Location = new System.Drawing.Point(644, 40);
+            this.linkViewLogForSalesInvoices.Name = "linkViewLogForSalesInvoices";
+            this.linkViewLogForSalesInvoices.Size = new System.Drawing.Size(54, 15);
+            this.linkViewLogForSalesInvoices.TabIndex = 15;
+            this.linkViewLogForSalesInvoices.TabStop = true;
+            this.linkViewLogForSalesInvoices.Text = "ViewLog";
+            this.linkViewLogForSalesInvoices.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.commonLinkLabel_LinkClicked);
+            // 
+            // lblSalesInvoicesError
+            // 
+            this.lblSalesInvoicesError.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.lblSalesInvoicesError.AutoSize = true;
+            this.lblSalesInvoicesError.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblSalesInvoicesError.ForeColor = System.Drawing.Color.Red;
+            this.lblSalesInvoicesError.Location = new System.Drawing.Point(569, 39);
+            this.lblSalesInvoicesError.Name = "lblSalesInvoicesError";
+            this.lblSalesInvoicesError.Size = new System.Drawing.Size(42, 18);
+            this.lblSalesInvoicesError.TabIndex = 14;
+            this.lblSalesInvoicesError.Text = "Error";
+            // 
+            // lblSalesInvoicesStatus
+            // 
+            this.lblSalesInvoicesStatus.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)));
+            this.lblSalesInvoicesStatus.AutoSize = true;
+            this.lblSalesInvoicesStatus.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblSalesInvoicesStatus.ForeColor = System.Drawing.Color.Black;
+            this.lblSalesInvoicesStatus.Location = new System.Drawing.Point(248, 40);
+            this.lblSalesInvoicesStatus.Name = "lblSalesInvoicesStatus";
+            this.lblSalesInvoicesStatus.Size = new System.Drawing.Size(63, 16);
+            this.lblSalesInvoicesStatus.TabIndex = 13;
+            this.lblSalesInvoicesStatus.Text = "Progress";
+            // 
+            // lblSalesInvoicesTitle
+            // 
+            this.lblSalesInvoicesTitle.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.lblSalesInvoicesTitle.AutoSize = true;
+            this.lblSalesInvoicesTitle.Font = new System.Drawing.Font("Century Gothic", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblSalesInvoicesTitle.ForeColor = System.Drawing.Color.Black;
+            this.lblSalesInvoicesTitle.Location = new System.Drawing.Point(3, 35);
+            this.lblSalesInvoicesTitle.Name = "lblSalesInvoicesTitle";
+            this.lblSalesInvoicesTitle.Size = new System.Drawing.Size(116, 21);
+            this.lblSalesInvoicesTitle.TabIndex = 12;
+            this.lblSalesInvoicesTitle.Text = "Sales Invoices";
+            // 
+            // lblSalesInvoicesDivider
+            // 
+            this.lblSalesInvoicesDivider.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
+            this.lblSalesInvoicesDivider.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.lblSalesInvoicesDivider.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
+            this.lblSalesInvoicesDivider.Location = new System.Drawing.Point(0, 68);
+            this.lblSalesInvoicesDivider.Margin = new System.Windows.Forms.Padding(0);
+            this.lblSalesInvoicesDivider.Name = "lblSalesInvoicesDivider";
+            this.lblSalesInvoicesDivider.Size = new System.Drawing.Size(721, 2);
+            this.lblSalesInvoicesDivider.TabIndex = 11;
+            // 
+            // timerSyncStaus
+            // 
+            this.timerSyncStaus.Enabled = true;
+            this.timerSyncStaus.Interval = 1000;
+            this.timerSyncStaus.Tick += new System.EventHandler(this.timerSyncStaus_Tick);
+            // 
+            // panel1
+            // 
+            this.panel1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.panel1.Controls.Add(this.linkViewLogForStocks);
+            this.panel1.Controls.Add(this.lblStocksError);
+            this.panel1.Controls.Add(this.lblStocksStatus);
+            this.panel1.Controls.Add(this.label3);
+            this.panel1.Controls.Add(this.lblStockTitle);
+            this.panel1.Location = new System.Drawing.Point(20, 234);
+            this.panel1.Name = "panel1";
+            this.panel1.Size = new System.Drawing.Size(721, 70);
+            this.panel1.TabIndex = 15;
+            // 
+            // linkViewLogForStocks
+            // 
+            this.linkViewLogForStocks.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.linkViewLogForStocks.AutoSize = true;
+            this.linkViewLogForStocks.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.linkViewLogForStocks.Location = new System.Drawing.Point(644, 40);
+            this.linkViewLogForStocks.Name = "linkViewLogForStocks";
+            this.linkViewLogForStocks.Size = new System.Drawing.Size(54, 15);
+            this.linkViewLogForStocks.TabIndex = 9;
+            this.linkViewLogForStocks.TabStop = true;
+            this.linkViewLogForStocks.Text = "ViewLog";
+            this.linkViewLogForStocks.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.commonLinkLabel_LinkClicked);
+            // 
+            // lblStocksError
+            // 
+            this.lblStocksError.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.lblStocksError.AutoSize = true;
+            this.lblStocksError.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblStocksError.ForeColor = System.Drawing.Color.Red;
+            this.lblStocksError.Location = new System.Drawing.Point(569, 39);
+            this.lblStocksError.Name = "lblStocksError";
+            this.lblStocksError.Size = new System.Drawing.Size(42, 18);
+            this.lblStocksError.TabIndex = 8;
+            this.lblStocksError.Text = "Error";
+            // 
+            // lblStocksStatus
+            // 
+            this.lblStocksStatus.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)));
+            this.lblStocksStatus.AutoSize = true;
+            this.lblStocksStatus.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblStocksStatus.ForeColor = System.Drawing.Color.Black;
+            this.lblStocksStatus.Location = new System.Drawing.Point(248, 40);
+            this.lblStocksStatus.Name = "lblStocksStatus";
+            this.lblStocksStatus.Size = new System.Drawing.Size(63, 16);
+            this.lblStocksStatus.TabIndex = 7;
+            this.lblStocksStatus.Text = "Progress";
+            // 
+            // label3
+            // 
+            this.label3.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
+            this.label3.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.label3.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
+            this.label3.Location = new System.Drawing.Point(0, 68);
+            this.label3.Margin = new System.Windows.Forms.Padding(0);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(721, 2);
+            this.label3.TabIndex = 6;
+            // 
+            // lblStockTitle
+            // 
+            this.lblStockTitle.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.lblStockTitle.AutoSize = true;
+            this.lblStockTitle.Font = new System.Drawing.Font("Century Gothic", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblStockTitle.ForeColor = System.Drawing.Color.Black;
+            this.lblStockTitle.Location = new System.Drawing.Point(3, 35);
+            this.lblStockTitle.Name = "lblStockTitle";
+            this.lblStockTitle.Size = new System.Drawing.Size(59, 21);
+            this.lblStockTitle.TabIndex = 5;
+            this.lblStockTitle.Text = "Stocks";
+            // 
+            // ctrlSyncStatus
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.Color.White;
+            this.Controls.Add(this.panel1);
+            this.Controls.Add(this.pnlSalesInvoices);
+            this.Controls.Add(this.pnlSKUs);
+            this.Controls.Add(this.pnlCustomer);
+            this.Controls.Add(this.pnlSalesOrder);
+            this.Controls.Add(this.lblControlTitle);
+            this.Name = "ctrlSyncStatus";
+            this.Size = new System.Drawing.Size(842, 487);
+            this.Load += new System.EventHandler(this.ctrlSyncStatus_Load);
+            this.pnlSalesOrder.ResumeLayout(false);
+            this.pnlSalesOrder.PerformLayout();
+            this.pnlCustomer.ResumeLayout(false);
+            this.pnlCustomer.PerformLayout();
+            this.pnlSKUs.ResumeLayout(false);
+            this.pnlSKUs.PerformLayout();
+            this.pnlSalesInvoices.ResumeLayout(false);
+            this.pnlSalesInvoices.PerformLayout();
+            this.panel1.ResumeLayout(false);
+            this.panel1.PerformLayout();
+            this.ResumeLayout(false);
+            this.PerformLayout();
+
+        }
+
+        #endregion
+
+        private System.Windows.Forms.Label lblControlTitle;
+        private System.Windows.Forms.Panel pnlSalesOrder;
+        private System.Windows.Forms.Label lblSalesOrderDivider;
+        private System.Windows.Forms.Label lblSalesOrderTitle;
+        private System.Windows.Forms.Panel pnlCustomer;
+        private System.Windows.Forms.Label lblCustomerDivider;
+        private System.Windows.Forms.Label lblCustomerTitle;
+        private System.Windows.Forms.Panel pnlSKUs;
+        private System.Windows.Forms.Label lblSKUsDivider;
+        private System.Windows.Forms.Label lblSKUTitle;
+        private System.Windows.Forms.Panel pnlSalesInvoices;
+        private System.Windows.Forms.Label lblSalesInvoicesTitle;
+        private System.Windows.Forms.Label lblSalesInvoicesDivider;
+        private System.Windows.Forms.Label lblSalesOrdersStatus;
+        private System.Windows.Forms.Label lblOutstandingsStatus;
+        private System.Windows.Forms.Label lblSKUsStatus;
+        private System.Windows.Forms.Label lblSalesInvoicesStatus;
+        private System.Windows.Forms.Label lblSalesOrdersError;
+        private System.Windows.Forms.Label lblOutstandingsError;
+        private System.Windows.Forms.Label lblSKUsError;
+        private System.Windows.Forms.Label lblSalesInvoicesError;
+        private System.Windows.Forms.LinkLabel linkViewLogForSalesOrders;
+        private System.Windows.Forms.LinkLabel linkViewLogForOutstandings;
+        private System.Windows.Forms.LinkLabel linkViewLogForSKUs;
+        private System.Windows.Forms.LinkLabel linkViewLogForSalesInvoices;
+        private System.Windows.Forms.Timer timerSyncStaus;
+        private System.Windows.Forms.Panel panel1;
+        private System.Windows.Forms.LinkLabel linkViewLogForStocks;
+        private System.Windows.Forms.Label lblStocksError;
+        private System.Windows.Forms.Label lblStocksStatus;
+        private System.Windows.Forms.Label label3;
+        private System.Windows.Forms.Label lblStockTitle;
+    }
+}

@@ -1,0 +1,29 @@
+﻿using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.Models
+{
+    [ModelAttributes(Key = "Id", TableName = "OrderStatusLine")]
+    public class OrderStatusLine
+    {
+        public Guid Id { get; set; }
+
+        public string OrderStatusId { get; set; }
+
+        public string ItemName { get; set; }
+
+        public decimal Qty { get; set; }
+
+        public decimal ShortCloseQty { get; set; }
+
+        public DateTime ShortCloseDate { get; set; }
+
+        public string ShortCloseReason { get; set; }
+
+        public string UnitOfMeasure { get; set; }
+    }
+}

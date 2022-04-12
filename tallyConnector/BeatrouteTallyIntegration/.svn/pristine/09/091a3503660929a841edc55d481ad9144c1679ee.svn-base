@@ -1,0 +1,300 @@
+﻿namespace BeatrouteTallyIntegration.Controls
+{
+    partial class ctrlDashboard
+    {
+        /// <summary> 
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary> 
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Component Designer generated code
+
+        /// <summary> 
+        /// Required method for Designer support - do not modify 
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(ctrlDashboard));
+            this.panel2 = new System.Windows.Forms.Panel();
+            this.label6 = new System.Windows.Forms.Label();
+            this.label5 = new System.Windows.Forms.Label();
+            this.label4 = new System.Windows.Forms.Label();
+            this.label3 = new System.Windows.Forms.Label();
+            this.lblHome1 = new System.Windows.Forms.Label();
+            this.panel3 = new System.Windows.Forms.Panel();
+            this.linkLabelAddCompany = new System.Windows.Forms.LinkLabel();
+            this.lblCompanyName = new System.Windows.Forms.Label();
+            this.lblActiveCompany = new System.Windows.Forms.Label();
+            this.linkLabelGoToSettings = new System.Windows.Forms.LinkLabel();
+            this.pictureBoxBeatroute = new System.Windows.Forms.PictureBox();
+            this.pictureBoxTally = new System.Windows.Forms.PictureBox();
+            this.lblBeatRouteConnectivity = new System.Windows.Forms.Label();
+            this.lblTallyConnectivity = new System.Windows.Forms.Label();
+            this.lblBeatroute = new System.Windows.Forms.Label();
+            this.lblTally = new System.Windows.Forms.Label();
+            this.lblStatus = new System.Windows.Forms.Label();
+            this.panel2.SuspendLayout();
+            this.panel3.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxBeatroute)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxTally)).BeginInit();
+            this.SuspendLayout();
+            // 
+            // panel2
+            // 
+            this.panel2.AutoSize = true;
+            this.panel2.BackColor = System.Drawing.Color.White;
+            this.panel2.Controls.Add(this.label6);
+            this.panel2.Controls.Add(this.label5);
+            this.panel2.Controls.Add(this.label4);
+            this.panel2.Controls.Add(this.label3);
+            this.panel2.Controls.Add(this.lblHome1);
+            this.panel2.Location = new System.Drawing.Point(10, 20);
+            this.panel2.Margin = new System.Windows.Forms.Padding(0);
+            this.panel2.Name = "panel2";
+            this.panel2.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
+            this.panel2.Size = new System.Drawing.Size(677, 148);
+            this.panel2.TabIndex = 1;
+            // 
+            // label6
+            // 
+            this.label6.AutoSize = true;
+            this.label6.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label6.Location = new System.Drawing.Point(22, 111);
+            this.label6.Name = "label6";
+            this.label6.Size = new System.Drawing.Size(189, 20);
+            this.label6.TabIndex = 4;
+            this.label6.Text = "with the respective brand.";
+            // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label5.Location = new System.Drawing.Point(22, 90);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(630, 20);
+            this.label5.TabIndex = 3;
+            this.label5.Text = "and data confidentiality guidelines. We maintain full transparency of what is bei" +
+    "ng shared";
+            // 
+            // label4
+            // 
+            this.label4.AutoSize = true;
+            this.label4.Font = new System.Drawing.Font("Microsoft Sans Serif", 15.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label4.Location = new System.Drawing.Point(20, 40);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(159, 25);
+            this.label4.TabIndex = 2;
+            this.label4.Text = "maximize sales";
+            // 
+            // label3
+            // 
+            this.label3.AutoSize = true;
+            this.label3.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label3.Location = new System.Drawing.Point(22, 70);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(582, 20);
+            this.label3.TabIndex = 1;
+            this.label3.Text = "BeatRoute is an independant platform and follows the highest standard of privacy";
+            // 
+            // lblHome1
+            // 
+            this.lblHome1.AutoSize = true;
+            this.lblHome1.Font = new System.Drawing.Font("Microsoft Sans Serif", 15.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblHome1.Location = new System.Drawing.Point(20, 16);
+            this.lblHome1.Name = "lblHome1";
+            this.lblHome1.Size = new System.Drawing.Size(586, 25);
+            this.lblHome1.TabIndex = 0;
+            this.lblHome1.Text = "Expedite your reimbursements & collaborate with the brand to";
+            // 
+            // panel3
+            // 
+            this.panel3.BackColor = System.Drawing.Color.White;
+            this.panel3.Controls.Add(this.linkLabelAddCompany);
+            this.panel3.Controls.Add(this.lblCompanyName);
+            this.panel3.Controls.Add(this.lblActiveCompany);
+            this.panel3.Controls.Add(this.linkLabelGoToSettings);
+            this.panel3.Controls.Add(this.pictureBoxBeatroute);
+            this.panel3.Controls.Add(this.pictureBoxTally);
+            this.panel3.Controls.Add(this.lblBeatRouteConnectivity);
+            this.panel3.Controls.Add(this.lblTallyConnectivity);
+            this.panel3.Controls.Add(this.lblBeatroute);
+            this.panel3.Controls.Add(this.lblTally);
+            this.panel3.Controls.Add(this.lblStatus);
+            this.panel3.Location = new System.Drawing.Point(10, 174);
+            this.panel3.Name = "panel3";
+            this.panel3.Size = new System.Drawing.Size(677, 118);
+            this.panel3.TabIndex = 2;
+            // 
+            // linkLabelAddCompany
+            // 
+            this.linkLabelAddCompany.AutoSize = true;
+            this.linkLabelAddCompany.Location = new System.Drawing.Point(237, 91);
+            this.linkLabelAddCompany.Name = "linkLabelAddCompany";
+            this.linkLabelAddCompany.Size = new System.Drawing.Size(73, 13);
+            this.linkLabelAddCompany.TabIndex = 10;
+            this.linkLabelAddCompany.TabStop = true;
+            this.linkLabelAddCompany.Text = "Add Company";
+            this.linkLabelAddCompany.Visible = false;
+            this.linkLabelAddCompany.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabelAddCompany_LinkClicked);
+            // 
+            // lblCompanyName
+            // 
+            this.lblCompanyName.AutoSize = true;
+            this.lblCompanyName.ForeColor = System.Drawing.Color.Black;
+            this.lblCompanyName.Location = new System.Drawing.Point(132, 91);
+            this.lblCompanyName.Name = "lblCompanyName";
+            this.lblCompanyName.Size = new System.Drawing.Size(99, 13);
+            this.lblCompanyName.TabIndex = 9;
+            this.lblCompanyName.Text = "No active company";
+            // 
+            // lblActiveCompany
+            // 
+            this.lblActiveCompany.AutoSize = true;
+            this.lblActiveCompany.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblActiveCompany.Location = new System.Drawing.Point(20, 89);
+            this.lblActiveCompany.Name = "lblActiveCompany";
+            this.lblActiveCompany.Size = new System.Drawing.Size(106, 16);
+            this.lblActiveCompany.TabIndex = 8;
+            this.lblActiveCompany.Text = "Active Company";
+            // 
+            // linkLabelGoToSettings
+            // 
+            this.linkLabelGoToSettings.AutoSize = true;
+            this.linkLabelGoToSettings.Location = new System.Drawing.Point(237, 47);
+            this.linkLabelGoToSettings.Name = "linkLabelGoToSettings";
+            this.linkLabelGoToSettings.Size = new System.Drawing.Size(74, 13);
+            this.linkLabelGoToSettings.TabIndex = 7;
+            this.linkLabelGoToSettings.TabStop = true;
+            this.linkLabelGoToSettings.Text = "Go to Settings";
+            this.linkLabelGoToSettings.Visible = false;
+            this.linkLabelGoToSettings.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabelGoToSettings_LinkClicked);
+            // 
+            // pictureBoxBeatroute
+            // 
+            this.pictureBoxBeatroute.Image = ((System.Drawing.Image)(resources.GetObject("pictureBoxBeatroute.Image")));
+            this.pictureBoxBeatroute.Location = new System.Drawing.Point(132, 66);
+            this.pictureBoxBeatroute.Name = "pictureBoxBeatroute";
+            this.pictureBoxBeatroute.Size = new System.Drawing.Size(20, 19);
+            this.pictureBoxBeatroute.SizeMode = System.Windows.Forms.PictureBoxSizeMode.CenterImage;
+            this.pictureBoxBeatroute.TabIndex = 6;
+            this.pictureBoxBeatroute.TabStop = false;
+            // 
+            // pictureBoxTally
+            // 
+            this.pictureBoxTally.Image = ((System.Drawing.Image)(resources.GetObject("pictureBoxTally.Image")));
+            this.pictureBoxTally.Location = new System.Drawing.Point(132, 43);
+            this.pictureBoxTally.Name = "pictureBoxTally";
+            this.pictureBoxTally.Size = new System.Drawing.Size(20, 19);
+            this.pictureBoxTally.SizeMode = System.Windows.Forms.PictureBoxSizeMode.CenterImage;
+            this.pictureBoxTally.TabIndex = 5;
+            this.pictureBoxTally.TabStop = false;
+            // 
+            // lblBeatRouteConnectivity
+            // 
+            this.lblBeatRouteConnectivity.AutoSize = true;
+            this.lblBeatRouteConnectivity.ForeColor = System.Drawing.Color.Crimson;
+            this.lblBeatRouteConnectivity.Location = new System.Drawing.Point(158, 69);
+            this.lblBeatRouteConnectivity.Name = "lblBeatRouteConnectivity";
+            this.lblBeatRouteConnectivity.Size = new System.Drawing.Size(29, 13);
+            this.lblBeatRouteConnectivity.TabIndex = 4;
+            this.lblBeatRouteConnectivity.Text = "Error";
+            // 
+            // lblTallyConnectivity
+            // 
+            this.lblTallyConnectivity.AutoSize = true;
+            this.lblTallyConnectivity.ForeColor = System.Drawing.Color.ForestGreen;
+            this.lblTallyConnectivity.Location = new System.Drawing.Point(158, 47);
+            this.lblTallyConnectivity.Name = "lblTallyConnectivity";
+            this.lblTallyConnectivity.Size = new System.Drawing.Size(59, 13);
+            this.lblTallyConnectivity.TabIndex = 3;
+            this.lblTallyConnectivity.Text = "Connected";
+            // 
+            // lblBeatroute
+            // 
+            this.lblBeatroute.AutoSize = true;
+            this.lblBeatroute.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblBeatroute.Location = new System.Drawing.Point(20, 67);
+            this.lblBeatroute.Name = "lblBeatroute";
+            this.lblBeatroute.Size = new System.Drawing.Size(72, 16);
+            this.lblBeatroute.TabIndex = 2;
+            this.lblBeatroute.Text = "BeatRoute";
+            // 
+            // lblTally
+            // 
+            this.lblTally.AutoSize = true;
+            this.lblTally.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblTally.Location = new System.Drawing.Point(20, 44);
+            this.lblTally.Name = "lblTally";
+            this.lblTally.Size = new System.Drawing.Size(38, 16);
+            this.lblTally.TabIndex = 1;
+            this.lblTally.Text = "Tally";
+            // 
+            // lblStatus
+            // 
+            this.lblStatus.AutoSize = true;
+            this.lblStatus.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblStatus.Location = new System.Drawing.Point(20, 17);
+            this.lblStatus.Name = "lblStatus";
+            this.lblStatus.Size = new System.Drawing.Size(56, 18);
+            this.lblStatus.TabIndex = 0;
+            this.lblStatus.Text = "Status";
+            // 
+            // ctrlDashboard
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.AutoSize = true;
+            this.BackColor = System.Drawing.Color.White;
+            this.Controls.Add(this.panel3);
+            this.Controls.Add(this.panel2);
+            this.Margin = new System.Windows.Forms.Padding(3, 0, 3, 0);
+            this.Name = "ctrlDashboard";
+            this.Size = new System.Drawing.Size(694, 438);
+            this.Load += new System.EventHandler(this.ctrlDashboard_Load);
+            this.panel2.ResumeLayout(false);
+            this.panel2.PerformLayout();
+            this.panel3.ResumeLayout(false);
+            this.panel3.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxBeatroute)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxTally)).EndInit();
+            this.ResumeLayout(false);
+            this.PerformLayout();
+
+        }
+
+        #endregion
+
+        private System.Windows.Forms.Panel panel2;
+        private System.Windows.Forms.Label label6;
+        private System.Windows.Forms.Label label5;
+        private System.Windows.Forms.Label label4;
+        private System.Windows.Forms.Label label3;
+        private System.Windows.Forms.Label lblHome1;
+        private System.Windows.Forms.Panel panel3;
+        private System.Windows.Forms.PictureBox pictureBoxBeatroute;
+        private System.Windows.Forms.PictureBox pictureBoxTally;
+        private System.Windows.Forms.Label lblBeatRouteConnectivity;
+        private System.Windows.Forms.Label lblTallyConnectivity;
+        private System.Windows.Forms.Label lblBeatroute;
+        private System.Windows.Forms.Label lblTally;
+        private System.Windows.Forms.Label lblStatus;
+        private System.Windows.Forms.LinkLabel linkLabelGoToSettings;
+        private System.Windows.Forms.LinkLabel linkLabelAddCompany;
+        private System.Windows.Forms.Label lblCompanyName;
+        private System.Windows.Forms.Label lblActiveCompany;
+    }
+}

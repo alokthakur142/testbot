@@ -1,0 +1,23 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationBase.Utils
+{
+    public static class Helpers
+    {
+        public static object ReplaceNullsWithEmptyString(object obj)
+        {
+            foreach (var field in obj.GetType().GetProperties())
+            {
+                if (field.GetValue(obj) == null)
+                    field.SetValue(obj, "");
+                if (field.Name == "source")
+                    field.SetValue(obj, "tally");
+            }
+            return obj;
+        }
+    }
+}

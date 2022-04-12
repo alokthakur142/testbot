@@ -1,0 +1,53 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationBase.API
+{
+    public class orderStatus
+    {
+        //public orderStatus()
+        //{
+        //    orderStatusLineItemList = new List<orderStatusLine>();
+        //}
+        //public string companyId { get; set; }
+
+        //public string voucherGuid { get; set; }
+
+        //public int alterId { get; set; }        
+        public string beatrouteOrderId { get; set; }
+
+        public string status { get; set; }
+
+        //public string cancelStatus { get; set; }
+
+        //public string deleteStatus { get; set; }
+        
+        //public bool isDeleted { get; set; }
+
+        //public bool isModified { get; set; }
+
+        //public bool isCancelled { get; set; }        
+
+        //public List<orderStatusLine> orderStatusLineItemList;
+        
+    }
+    //public class orderStatusLine
+    //{
+    //    public string orderStatusId { get; set; }
+
+    //    public string itemName { get; set; }
+
+    //    public decimal qty { get; set; }
+
+    //    public decimal shortCloseQty { get; set; }
+
+    //    public DateTime shortCloseDate { get; set; }
+
+    //    public string shortCloseReason { get; set; }
+
+    //    public string unitOfMeasure { get; set; }
+    //}
+}

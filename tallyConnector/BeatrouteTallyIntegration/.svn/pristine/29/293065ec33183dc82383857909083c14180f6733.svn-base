@@ -1,0 +1,86 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using NLog;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using BeatrouteTallyIntegration.Utils;
+using BeatrouteTallyIntegrationBase.Helpers;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationBase.Import;
+
+namespace BeatrouteTallyIntegration.Controls
+{
+    public partial class ctrlCompanySyncStatus : UserControl
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+
+        public ctrlCompanySyncStatus()
+        {
+            InitializeComponent();
+        }
+
+        public void SetStatus(bool isActive)
+        {
+            if (isActive)
+            {
+                lblStatus.Text = "Active: Yes";
+                lblStatus.ForeColor = Color.DarkOliveGreen;
+                lblSyncNow.Enabled = true;
+            }
+            else
+            {
+                lblStatus.Text = "Active: No";
+                lblStatus.ForeColor = Color.DarkRed;
+                lblSyncNow.Enabled = false;
+            }
+        }
+
+        public void SetLastSyncTally(DateTime time)
+        {
+            lblLastTallySync.Text = "Last Sync (Tally): " + time.ToString("dd-MMM-yyyy HH:mm:ss");
+        }
+
+        public void SetLastSyncWeb(DateTime time)
+        {
+            lblLastSyncWeb.Text = "Last Sync (Web): " + time.ToString("dd-MMM-yyyy HH:mm:ss");
+        }
+
+        private void lblSyncNow_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    ImportController impController = new ImportController();
+                    impController.UpdateCompanyName();
+
+                    var activeCompanyList = uow.Company.GetList().Where(x => x.CompanyName == lblCompanyName.Text);
+                    _logger.Info("ImportWorker|" + Session.UserName + "|Sync started from dashboard.." + "^");
+                    SyncTallyData.SyncData(activeCompanyList); 
+                    _logger.Info("ImportWorker|" + Session.UserName + "|Sync completed" + "^");
+                    _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                }
+                MessagePopup.ShowMessage("Sync started");
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+                //throw;
+            }
+            //MessageBox.Show("To be implemented");
+        }
+
+        public void SetCompanyName(string companyName, Guid companyId)
+        {
+            lblCompanyName.Text = companyName;
+            lblCompanyId.Text = companyId.ToString();
+        }
+    }
+}

@@ -1,0 +1,19 @@
+﻿using BeatrouteTallyIntegrationDAL.BusinessRepository.Interface;
+using BeatrouteTallyIntegrationDAL.Models;
+using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.BusinessRepository.Class
+{
+    public class CompanyRepository : Repository<Company>, ICompanyRepository
+    {
+        public CompanyRepository(string connectionString, ConnectionType connectionType) : base(connectionString, connectionType)
+        {
+
+        }
+    }
+}

@@ -1,0 +1,175 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{EE182274-2553-4D84-819C-032B529EA579}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>BeatrouteTallyIntegrationDAL</RootNamespace>
+    <AssemblyName>BeatrouteTallyIntegrationDAL</AssemblyName>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ContentSQLiteInteropFiles>true</ContentSQLiteInteropFiles>
+    <CopySQLiteInteropFiles>false</CopySQLiteInteropFiles>
+    <CleanSQLiteInteropFiles>false</CleanSQLiteInteropFiles>
+    <CollectSQLiteInteropFiles>false</CollectSQLiteInteropFiles>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ContentSQLiteInteropFiles>true</ContentSQLiteInteropFiles>
+    <CopySQLiteInteropFiles>false</CopySQLiteInteropFiles>
+    <CleanSQLiteInteropFiles>false</CleanSQLiteInteropFiles>
+    <CollectSQLiteInteropFiles>false</CollectSQLiteInteropFiles>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="AutoUpdater.NET, Version=1.7.0.0, Culture=neutral, PublicKeyToken=501435c91b35f4bc, processorArchitecture=MSIL">
+      <HintPath>..\packages\Autoupdater.NET.Official.1.7.0\lib\net45\AutoUpdater.NET.dll</HintPath>
+    </Reference>
+    <Reference Include="Dapper, Version=1.50.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Dapper.1.50.2\lib\net451\Dapper.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
+      <HintPath>..\packages\NLog.4.7.9\lib\net45\NLog.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="OrchidDALBase, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\BeatrouteTallyIntegrationBase\Dlls\OrchidDALBase.dll</HintPath>
+    </Reference>
+    <Reference Include="PresentationFramework" />
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Transactions" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+    <Reference Include="WindowsBase" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="BusinessRepository\Class\ApiCallRepository.cs" />
+    <Compile Include="BusinessRepository\Class\BillReferencesRepository.cs" />
+    <Compile Include="BusinessRepository\Class\CompanyRepository.cs" />
+    <Compile Include="BusinessRepository\Class\CustomerOrderItemLinesRepository.cs" />
+    <Compile Include="BusinessRepository\Class\CustomerOrderRepository.cs" />
+    <Compile Include="BusinessRepository\Class\CustomerOutstandingRepository.cs" />
+    <Compile Include="BusinessRepository\Class\CustomerPaymentPostingConfirmationRepository.cs" />
+    <Compile Include="BusinessRepository\Class\CustomerPaymentRepository.cs" />
+    <Compile Include="BusinessRepository\Class\CustomerPostedPaymentRepository.cs" />
+    <Compile Include="BusinessRepository\Class\CustomersRepository.cs" />
+    <Compile Include="BusinessRepository\Class\ErrorLogRepository.cs" />
+    <Compile Include="BusinessRepository\Class\ItemsRepository.cs" />
+    <Compile Include="BusinessRepository\Class\LedgerRepository.cs" />
+    <Compile Include="BusinessRepository\Class\LoginRepository.cs" />
+    <Compile Include="BusinessRepository\Class\OrderStatusLineRepository.cs" />
+    <Compile Include="BusinessRepository\Class\OrderStatusRepository.cs" />
+    <Compile Include="BusinessRepository\Class\RefreshTokenApiRepository.cs" />
+    <Compile Include="BusinessRepository\Class\SalesInvoiceItemLinesRepository.cs" />
+    <Compile Include="BusinessRepository\Class\SalesInvoiceRepository.cs" />
+    <Compile Include="BusinessRepository\Class\SettingsRepository.cs" />
+    <Compile Include="BusinessRepository\Class\StockRepository.cs" />
+    <Compile Include="BusinessRepository\Class\SyncStatusRepository.cs" />
+    <Compile Include="BusinessRepository\Class\TaxAndChargesLinesRepository.cs" />
+    <Compile Include="BusinessRepository\Class\UpdateDetailsRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\IApiCallRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\IBillReferencesRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ICompanyRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ICustomerOrderItemLinesRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ICustomerOrderRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ICustomerOutstandingRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ICustomerPaymentRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ICustomerPaymentPostingConfirmationRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ICustomerPostedPaymentRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ICustomersRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\IErrorLogRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\IItemsRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ILedgerRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ILoginRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\IOrderStatusLineRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\IOrderStatusRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\IRefreshTokenApiRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ISalesInvoiceItemLinesRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ISalesInvoiceRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ISettingsRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\IStockRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ISyncStatusRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\ITaxAndChargesLinesRepository.cs" />
+    <Compile Include="BusinessRepository\Interface\IUpdateDetailsRepository.cs" />
+    <Compile Include="Class1.cs" />
+    <Compile Include="Models\ApiCall.cs" />
+    <Compile Include="Models\BillReferences.cs" />
+    <Compile Include="Models\Company.cs" />
+    <Compile Include="Models\CustomerOrder.cs" />
+    <Compile Include="Models\CustomerOutstanding.cs" />
+    <Compile Include="Models\CustomerPayment.cs" />
+    <Compile Include="Models\CustomerPaymentPostingConfirmation.cs" />
+    <Compile Include="Models\CustomerPostedPayment.cs" />
+    <Compile Include="Models\Customers.cs" />
+    <Compile Include="Models\ErrorLog.cs" />
+    <Compile Include="Models\Items.cs" />
+    <Compile Include="Models\CustomerOrderItemLines.cs" />
+    <Compile Include="Models\Ledgers.cs" />
+    <Compile Include="Models\Login.cs" />
+    <Compile Include="Models\OrderStatus.cs" />
+    <Compile Include="Models\OrderStatusLine.cs" />
+    <Compile Include="Models\RefreshTokenApi.cs" />
+    <Compile Include="Models\SalesInvoice.cs" />
+    <Compile Include="Models\SalesInvoiceItemLines.cs" />
+    <Compile Include="Models\Settings.cs" />
+    <Compile Include="Models\Stock.cs" />
+    <Compile Include="Models\SyncStatus.cs" />
+    <Compile Include="Models\TaxAndChargesLines.cs" />
+    <Compile Include="Models\UpdateDetails.cs" />
+    <Compile Include="Models\ViewModels\CustomerPaymentPostingViewModel.cs" />
+    <Compile Include="Models\ViewModels\ErrorLogViewModel.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="QueryHelperMethods\QueryHelper.cs" />
+    <Compile Include="UnitOfWork\UnitOfWork.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="NLog.config" />
+    <None Include="NLog.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

@@ -1,0 +1,288 @@
+﻿using BeatrouteTallyIntegrationDAL.BusinessRepository.Class;
+using BeatrouteTallyIntegrationDAL.BusinessRepository.Interface;
+using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.UnitOfWork
+{
+    public class UnitOfWork : UnitOfWorkBase
+    {
+        string _connStr = string.Empty;
+        ConnectionType _connType = ConnectionType.SQLite;
+        static string _applicationConnectionString = string.Empty;
+
+        public UnitOfWork(string connectionString, ConnectionType connType) : base(connectionString, connType)
+        {
+            _connStr = connectionString;
+            _connType = connType;
+        }
+        public UnitOfWork(string connectionString) : base(connectionString)
+        {
+            _connStr = connectionString;
+        }
+
+        #region Static Methods
+        public static string GetConnectionString()
+        {
+            //return "data source=" + Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) + "\\Database\\BeatrouteTallyIntegration.db";
+            CheckIfDbFileExists();
+            return _applicationConnectionString;
+        }
+
+        private static void CheckIfDbFileExists()
+        {
+            string dbName = "BeatrouteTallyIntegration.db";
+
+            string dbDirectory = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\BeatrouteTallyIntegration\\Database";
+            string NewCopy = Path.Combine(dbDirectory, dbName);
+            try
+            {
+                if (File.Exists(NewCopy))
+                {
+                    UnitOfWork.SetConnectionString(NewCopy);
+                }
+                //else
+                //{
+                //    //_logger.Info("Db doesn't exist. Thread going to sleep for 4 hours");
+                //    return string.Empty;
+                //}
+            }
+            catch (Exception)
+            {
+                //_logger.Fatal(ex);
+                //_logger.Fatal(" ");
+                //return string.Empty;
+            }
+        }
+
+        public static void SetConnectionString(string connString)
+        {
+            _applicationConnectionString = "datasource=" + connString;
+        }
+        #endregion
+
+        #region Private Fields
+        private ICompanyRepository repCompany;
+        private ICustomerOrderItemLinesRepository repCustomerOrderItemLines;
+        private ICustomerOrderRepository repCustomerOrder;
+        private ICustomerOutstandingRepository repCustomerOutstanding;
+        private ICustomerPaymentRepository repCustomerPayment;
+        private ICustomerPaymentPostingConfirmationRepository repCustomerPaymentPostingConfirmation;
+        private ICustomerPostedPaymentRepository repCustomerPostedPayement;
+        private ICustomersRepository repCustomers;
+        private IItemsRepository repItems;
+        private ILoginRepository repLogin;
+        private IBillReferencesRepository repBillReferences;
+        private IRefreshTokenApiRepository repRefreshTokenApi;
+        private ISalesInvoiceItemLinesRepository repSalesInvoiceItemLines;
+        private ISalesInvoiceRepository repSalesInvoice;
+        private ISettingsRepository repSettings;
+        private IStockRepository repStock;
+        private ITaxAndChargesLinesRepository repTaxAndChargesLines;
+        private IApiCallRepository repApiCall;
+        private ILedgerRepository repLedger;
+        private IErrorLogRepository repErrorLog;
+        private IOrderStatusRepository repOrderStatus;
+        private IOrderStatusLineRepository repOrderStatusLine;
+        private IUpdateDetailsRepository repUpdateDetails;
+        private ISyncStatusRepository syncStatus;
+        #endregion
+
+        #region Public Fields
+        public ICompanyRepository Company
+        {
+            get
+            {
+                return repCompany ?? (repCompany = new CompanyRepository(_connStr, _connType));
+            }
+        }
+
+        public ICustomerOrderItemLinesRepository CustomerOrderItemLines
+        {
+            get
+            {
+                return repCustomerOrderItemLines ?? (repCustomerOrderItemLines = new CustomerOrderItemLinesRepository(_connStr, _connType));
+            }
+        }
+
+        public ICustomerOrderRepository CustomerOrder
+        {
+            get
+            {
+                return repCustomerOrder ?? (repCustomerOrder = new CustomerOrderRepository(_connStr, _connType));
+            }
+        }
+
+        public ICustomerOutstandingRepository CustomerOutstanding
+        {
+            get
+            {
+                return repCustomerOutstanding ?? (repCustomerOutstanding = new CustomerOutstandingRepository(_connStr, _connType));
+            }
+        }
+
+        public ICustomerPaymentRepository CustomerPayment
+        {
+            get
+            {
+                return repCustomerPayment ?? (repCustomerPayment = new CustomerPaymentRepository(_connStr, _connType));
+            }
+        }
+
+        public ICustomerPaymentPostingConfirmationRepository CustomerPaymentPostingConfirmation
+        {
+            get
+            {
+                return repCustomerPaymentPostingConfirmation ?? (repCustomerPaymentPostingConfirmation = new CustomerPaymentPostingConfirmationRepository(_connStr, _connType));
+            }
+        }
+
+        public ICustomerPostedPaymentRepository CustomerPostedPayement
+        {
+            get
+            {
+                return repCustomerPostedPayement ?? (repCustomerPostedPayement = new CustomerPostedPaymentRepository(_connStr, _connType));
+            }
+        }
+
+        public ICustomersRepository Customers
+        {
+            get
+            {
+                return repCustomers ?? (repCustomers = new CustomersRepository(_connStr, _connType));
+            }
+        }
+
+        public IItemsRepository Items
+        {
+            get
+            {
+                return repItems ?? (repItems = new ItemsRepository(_connStr, _connType));
+            }
+        }
+
+        public ILoginRepository Login
+        {
+            get
+            {
+                return repLogin ?? (repLogin = new LoginRepository(_connStr, _connType));
+            }
+        }
+
+        public IBillReferencesRepository BillReferences
+        {
+            get
+            {
+                return repBillReferences ?? (repBillReferences = new BillReferencesRepository(_connStr, _connType));
+            }
+        }
+
+        public IRefreshTokenApiRepository RefreshTokenApi
+        {
+            get
+            {
+                return repRefreshTokenApi ?? (repRefreshTokenApi = new RefreshTokenApiRepository(_connStr, _connType));
+            }
+        }
+
+        public ISalesInvoiceItemLinesRepository SalesInvoiceItemLines
+        {
+            get
+            {
+                return repSalesInvoiceItemLines ?? (repSalesInvoiceItemLines = new SalesInvoiceItemLinesRepository(_connStr, _connType));
+            }
+        }
+
+        public ISalesInvoiceRepository SalesInvoice
+        {
+            get
+            {
+                return repSalesInvoice ?? (repSalesInvoice = new SalesInvoiceRepository(_connStr, _connType));
+            }
+        }
+
+        public ISettingsRepository Settings
+        {
+            get
+            {
+                return repSettings ?? (repSettings = new SettingsRepository(_connStr, _connType));
+            }
+        }
+
+        public IStockRepository Stock
+        {
+            get
+            {
+                return repStock ?? (repStock = new StockRepository(_connStr, _connType));
+            }
+        }
+
+        public ITaxAndChargesLinesRepository TaxAndChargesLines
+        {
+            get
+            {
+                return repTaxAndChargesLines ?? (repTaxAndChargesLines = new TaxAndChargesLinesRepository(_connStr, _connType));
+            }
+        } 
+
+        public IApiCallRepository ApiCall
+        {
+            get
+            {
+                return repApiCall ?? (repApiCall = new ApiCallRepository(_connStr, _connType));
+            }
+        }
+
+        public ILedgerRepository Ledgers
+        {
+            get
+            {
+                return repLedger ?? (repLedger = new LedgerRepository(_connStr, _connType));
+            }
+        }
+
+        public IErrorLogRepository ErrorLog
+        {
+            get
+            {
+                return repErrorLog ?? (repErrorLog = new ErrorLogRepository(_connStr, _connType));
+            }
+        }
+
+        public IOrderStatusRepository OrderStatus
+        {
+            get
+            {
+                return repOrderStatus ?? (repOrderStatus = new OrderStatusRepository(_connStr, _connType));
+            }
+        }
+
+        public IOrderStatusLineRepository OrderStatusLine
+        {
+            get
+            {
+                return repOrderStatusLine ?? (repOrderStatusLine = new OrderStatusLineRepository(_connStr, _connType));
+            }
+        }
+        public IUpdateDetailsRepository UpdateDetails
+        {
+            get
+            {
+                return repUpdateDetails ?? (repUpdateDetails = new UpdateDetailsRepository(_connStr, _connType));
+            }
+        }
+        public ISyncStatusRepository SyncStatus
+        {
+            get
+            {
+                return syncStatus ?? (syncStatus = new SyncStatusRepository(_connStr, _connType));
+            }
+        }
+        #endregion
+    }
+}

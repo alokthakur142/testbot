@@ -1,0 +1,29 @@
+﻿using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.Models
+{
+    [ModelAttributes(Key = "Id", TableName = "CustomerPaymentPostingConfirmation")]
+    public class CustomerPaymentPostingConfirmation
+    {
+        public Guid Id { get; set; }
+        public string BeatroutePaymentId { get; set; }
+        public string CompanyId { get; set; }
+        public string CustomerName { get; set; }
+        public string CustomerId { get; set; }
+        public bool IsSuccess { get; set; }
+        public string Message { get; set; }
+        public bool IsPosted { get; set; }
+        public bool IsOptional { get; set; }
+        public string VoucherNo { get; set; }
+        public DateTime VoucherDate { get; set; }
+        public decimal RetryCount { get; set; }
+        public string PostingMessage { get; set; }
+        public DateTime PostedOn { get; set; }
+        public DateTime ImportedOn { get; set; }
+    }
+}

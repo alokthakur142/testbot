@@ -1,0 +1,785 @@
+﻿using BeatrouteTallyIntegration.Database.Scripts;
+using BeatrouteTallyIntegration.Utils;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationBase.Helpers;
+using BeatrouteTallyIntegrationBase.Import;
+using BeatrouteTallyIntegrationBase.Utils;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.QueryHelperMethods;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using NLog;
+using NLog.Config;
+using NLog.Targets;
+using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Configuration;
+using System.Data;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Security.AccessControl;
+using System.Security.Principal;
+using System.Threading;
+using System.Windows.Forms;
+using System.Xml;
+
+
+namespace BeatrouteTallyIntegration
+{
+    internal static class ImportWorker
+    {
+        private static int dbVersionNo = 19;
+        private const string VERSION_NO = "1.0.164";
+        private const string VERSION_UPDATE_URL = "https://brconnector.s3.ap-south-1.amazonaws.com/BeatrouteTallyConnector.xml";
+        //private const string VERSION_UPDATE_URL = "http://ops.easyreports.in/BeatrouteTallyConnector.xml";
+        
+
+        public static BackgroundWorker Worker { get; set; }
+
+        private static Logger logger = LogManager.GetLogger("AppLog");
+
+        public static void Worker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            ///Assigning value of version in the Session variable
+            ///
+            Session.VersionNo = VERSION_NO;
+            #region Adding Database
+            string dbName = "BeatrouteTallyIntegration.db";
+            string FileCopy = Application.StartupPath + "\\Database\\" + dbName;
+            logger.Debug("ImportWorker|" + Session.UserName + "|" + FileCopy + "^");
+            logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+            //string FileCopy = Path.Combine(@"C:\Users\subhabrata\Projects\XpedizeTallyIntegration\XpedizeTallyIntegration\XpedizeTallyIntegration\Database", dbName);
+            string dbDirectory = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\BeatrouteTallyIntegration\\Database";
+            string NewCopy = Path.Combine(dbDirectory, dbName);
+            try
+            {
+                if (!File.Exists(NewCopy))
+                {
+                    logger.Info("ImportWorker|" + Session.UserName + "|Creating folder for database file." + "^");
+                    logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                    CreateFolder(true, dbDirectory);
+                    File.Copy(FileCopy, NewCopy);
+                    UnitOfWork.SetConnectionString(NewCopy);
+                    logger.Info("Import Worker|" + Session.UserName + "|Database file created." + "^");
+                    logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                }
+                else
+                    Session.ConnectionString = UnitOfWork.GetConnectionString();
+
+
+            }
+            catch (Exception ex)
+            {
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+            CreateFileForUrl(dbDirectory);
+            #endregion
+
+            ///Setting the connection string for the background worker
+            ///
+            Session.ConnectionString = UnitOfWork.GetConnectionString();
+
+            while (true)
+            {
+                ///Setting default frequency to 5 minutes
+                ///
+                ///
+                int timeout = 1;
+                string range = "Minutes";
+                try
+                {
+                    logger.Info("ImportWorker|" + Session.UserName + "|Starting sync execution..." + "^");
+                    logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                    if (!string.IsNullOrEmpty(Session.ConnectionString))
+                    {
+                        using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                        {
+                            ///Check for DataBase Update
+                            ///
+                            CheckDbVersionAndUpdate();
+
+                            #region Set Sync Status Value
+                            SetSyncStatusValue(uow, SyncStatusTextMessageHelper.Outstandings);
+                            SetSyncStatusValue(uow, SyncStatusTextMessageHelper.Skus);
+                            SetSyncStatusValue(uow, SyncStatusTextMessageHelper.Stocks);
+                            SetSyncStatusValue(uow, SyncStatusTextMessageHelper.SalesInvoices);
+                            SetSyncStatusValue(uow, SyncStatusTextMessageHelper.SalesOrders);
+                            #endregion
+
+                            #region Add Update Details
+                            AddUpdateDetails();
+                            #endregion
+
+                            Login user = uow.Login.GetList().FirstOrDefault();
+                            if (user != null)
+                            {
+                                logger.Info("ImportWorker|" + Session.UserName + "|Get settings..." + "^");
+                                logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                                #region Initiating settings
+
+                                Settings tallyIP = uow.Settings.GetList().Where(x => x.Key == "IP").FirstOrDefault();
+                                if (tallyIP == null)
+                                    Session.TallyIp = "localhost";
+                                else
+                                    Session.TallyIp = tallyIP.Value;
+
+                                Settings tallyPort = uow.Settings.GetList().Where(x => x.Key == "PORT").FirstOrDefault();
+                                if (tallyPort == null)
+                                    Session.TallyPort = "9000";
+                                else
+                                    Session.TallyPort = tallyPort.Value;
+
+                                Settings syncFreq = uow.Settings.GetList().Where(x => x.Key == "FREQUENCY").FirstOrDefault();
+                                if (syncFreq == null)
+                                    Session.SyncFrequency = 5;
+                                else
+                                    Session.SyncFrequency = Convert.ToInt32(syncFreq.Value);
+
+                                Settings freqRange = uow.Settings.GetList().Where(x => x.Key == "RANGE").FirstOrDefault();
+                                if (freqRange != null)
+                                    range = freqRange.Value;
+                                else
+                                    range = "Minutes";
+
+                                Settings productFilter = uow.Settings.GetList().Where(x => x.Key == "PRODUCT_FILTER").FirstOrDefault();
+                                if (productFilter != null)
+                                    Session.ProductFilter = productFilter.Value;
+                                logger.Info("ImportWorker|" + Session.UserName + "|Get settings completed" + "^");
+                                logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                                #endregion
+
+                                #region Checking company name change
+
+                                logger.Info("ImportWorker|" + Session.UserName + "|Checking for updated company name..." + "^");
+                                logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                ImportController impController = new ImportController();
+                                impController.UpdateCompanyName();
+
+                                #endregion
+
+                                #region Checking active company
+                                var activeCompanyList = uow.Company.GetList().Where(x => x.IsActive);
+                                string activeCompanyNames = string.Empty;
+                                foreach (var company in activeCompanyList)
+                                {
+                                    activeCompanyNames += company.CompanyName + ",";
+                                }
+                                if (!string.IsNullOrEmpty(activeCompanyNames))
+                                {
+                                    activeCompanyNames = activeCompanyNames.Substring(0, activeCompanyNames.Length - 1);
+                                    logger.Info("ImportWorker|" + Session.UserName + "|Active companies: " + activeCompanyNames + "^");
+                                    logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                }
+                                else
+                                {
+                                    logger.Info("ImportWorker|" + Session.UserName + "|No active companies found. Sync and Post data not initiating." + "^");
+                                    logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                }
+
+                                #endregion
+
+                                #region Starting syncing and posting
+                                if (activeCompanyList.Count() > 0)
+                                {
+                                    logger.Info("Import Worker|" + Session.UserName + "|Starting sync..." + "^");
+                                    logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                    SyncTallyData.SyncData(activeCompanyList);
+                                    logger.Info("ImportWorker|" + Session.UserName + "|Sync process completed" + "^");
+                                    logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                                    logger.Info("ImportWorker|" + Session.UserName + "|Starting post..." + "^");
+                                    logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                    PostTallyData.PostData(activeCompanyList);
+                                    logger.Info("ImportWorker|" + Session.UserName + "|Post process completed" + "^");
+                                    logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                }
+                                else
+                                {
+                                    logger.Error("ImportWorker|" + Session.UserName + "|Sync and Post failed - No active companies found in database." + "^");
+                                    logger.Error("ImportWorker|" + Session.UserName + "|" + "^");
+                                }
+                                #endregion
+
+                                #region Posting Logs
+                                PostLogs(user);
+                                #endregion
+                            }
+                            else
+                            {
+                                logger.Error("ImportWorker|" + Session.UserName + "|Sync and Post failed - No user found in database." + "^");
+                                logger.Error("ImportWorker|" + Session.UserName + "|" + "^");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        logger.Error("ImportWorker|" + Session.UserName + "|Connection string unavailable." + "^");
+                        logger.Error("ImportWorker|" + Session.UserName + "|" + "^");
+                    }
+
+
+                }
+                catch (Exception ex)
+                {
+                    if (ex.Message.Contains("Unable to connect to the remote server") && !string.IsNullOrEmpty(Session.TallyIp) && !string.IsNullOrEmpty(Session.TallyPort) || ex.Message.Contains("Tally is not open"))
+                    {
+                        ErrorLogger.LogError(logger, "Import Worker", "ImportWorker|" + Session.UserName + "|Tally is not available for IP: " + Session.TallyIp + ", PORT: " + Session.TallyPort + "^");
+                    }
+
+                    else if (ex.Message.Contains("is not open in tally"))
+                    {
+                        ErrorLogger.LogError(logger, "Import Worker", "ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                    }
+                    else if (ex.Message.Contains("Tally is running in education mode"))
+                    {
+                        ErrorLogger.LogError(logger, "Import Worker", "ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                    }
+                    else
+                        logger.Fatal("ImportWorker|" + Session.UserName + "|Error in background worker: " + ex.Message + "\r\n" + ex.InnerException + "^");
+                }
+
+                #region Setting Frequency for thread sleep
+
+                if (Session.SyncFrequency == 0)
+                    Session.SyncFrequency = timeout;
+
+                if (range == "Hours")
+                    timeout = Session.SyncFrequency * 3600000;
+                else if (range == "Minutes")
+                    timeout = Session.SyncFrequency * 60000;
+                else
+                    timeout = Session.SyncFrequency * 60000;
+
+                #endregion
+
+                ///Check for Update
+                ///
+
+                #region Check for Update Calling region
+
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    UpdateDetails updateDetails = uow.UpdateDetails.GetList().FirstOrDefault();
+                    if (DateTime.Now.Subtract(updateDetails.LastUpdateTime).TotalHours >= 24)
+                    {
+                        CheckForUpdate();
+                        updateDetails.LastUpdateTime = DateTime.Now;
+                        uow.UpdateDetails.Update(updateDetails);
+                    }
+                    logger.Info("ImportWorker|" + Session.UserName + "|Update checking date and time " + updateDetails.LastUpdateTime + "^");
+                    logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                }
+
+                #endregion
+
+                logger.Info("ImportWorker|" + Session.UserName + "|Background Worker going to sleep for - " + Session.SyncFrequency + " " + range + "^");
+                logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                Thread.Sleep(timeout);
+            }
+
+        }
+
+        public static bool PostLogs(Login user)
+        {
+            try
+            {
+
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                {
+                    int noOfPages = 0;
+                    int PAGE_SIZE = 1000;
+                    string logFilePath = string.Empty;
+                    DateTime LastDateTimeForLogs = user.LastDateTimeForLogs;
+                    var appSettings = (ConfigurationManager.AppSettings["LogsPostingFrequency"]);
+                    if (appSettings == "")
+                    {
+                        appSettings = "5";
+                    }
+                    var logsPostingFrequency = int.Parse(appSettings);
+
+                    TimeSpan interval = TimeSpan.FromMinutes(logsPostingFrequency);
+                    string logsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\BeatrouteTallyIntegration\\Logs";
+                    List<SendLogHelper> logsList = new List<SendLogHelper>();
+                    if (Directory.Exists(logsDirectory))
+                    {
+                        string appLogPath = Path.Combine(logsDirectory, "AppLog.txt");
+                        string apiLogPath = Path.Combine(logsDirectory, "ApiLog.txt");
+
+                        string outstandingLogPath = Path.Combine(logsDirectory, "OutstandingLog.txt");
+                        string skuLogPath = Path.Combine(logsDirectory, "SKULog.txt");
+                        string stockPath = Path.Combine(logsDirectory, "StockLog.txt");
+                        string salesInvoicePath = Path.Combine(logsDirectory, "SalesInvoiceLog.txt");
+                        string salesOrderPath = Path.Combine(logsDirectory, "SalesOrderLog.txt");
+
+                        if (DateTime.Now.Subtract(LastDateTimeForLogs).TotalMinutes >= interval.TotalMinutes)
+                        {
+                            #region For App Log                           
+                            if (File.Exists(appLogPath))
+                            {
+                                ReadingLogs(appLogPath, logsList);
+                            }
+                            #endregion
+
+                            #region For Api Log                                                                                    
+                            if (File.Exists(apiLogPath))
+                            {
+                                ReadingLogs(apiLogPath, logsList);
+                            }
+
+                            #endregion
+
+                            #region For Outstandings Log
+                            if (File.Exists(outstandingLogPath))
+                            {
+                                ReadingLogs(outstandingLogPath, logsList);
+                            }
+                            #endregion
+
+                            #region For SKU Log
+                            if (File.Exists(skuLogPath))
+                            {
+                                ReadingLogs(skuLogPath, logsList);
+                            }
+                            #endregion
+
+                            #region For Stock Log
+                            if (File.Exists(stockPath))
+                            {
+                                ReadingLogs(stockPath, logsList);
+                            }
+                            #endregion
+
+                            #region For Sales Invoice Log
+                            if (File.Exists(salesInvoicePath))
+                            {
+                                ReadingLogs(salesInvoicePath, logsList);
+                            }
+                            #endregion
+
+                            #region For Sales Order Log
+                            if (File.Exists(salesOrderPath))
+                            {
+                                ReadingLogs(salesOrderPath, logsList);
+                            }
+                            #endregion
+
+                            if (logsList.Count > 0)
+                            {
+                                noOfPages = (int)Math.Ceiling((decimal)logsList.Count / (decimal)PAGE_SIZE);
+                                for (int i = 0; i < noOfPages; i++)
+                                {
+                                    ApiHelper.PostLogsToBeatRoute(logsList.Skip(i * PAGE_SIZE).Take(PAGE_SIZE)?.ToList());
+                                }
+                                LastDateTimeForLogs = DateTime.Now;
+                                user.LastDateTimeForLogs = LastDateTimeForLogs;
+                                uow.Login.Update(user);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        return false;
+                    }
+
+
+                }
+                return true;
+            }
+
+            catch (Exception ex)
+            {
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+                return false;
+            }
+        }
+
+        public static void ReadingLogs(string filePath, List<SendLogHelper> logsList)
+        {
+
+            #region Adding Logs to List
+            string lines = File.ReadAllText(filePath);
+            var linesArray = lines.Split('^');
+            foreach (string line in linesArray)
+            {
+                SendLogHelper helperObject = new SendLogHelper();
+                if (!string.IsNullOrWhiteSpace(line) || line.Contains("\r\n"))
+                {
+
+                    var logsArray = line.Split('|');
+
+                    if (logsArray.Length < 5)
+                    {
+                        continue;
+                    }
+                    if (!string.IsNullOrEmpty(logsArray[5]))
+                    {
+                        string date = logsArray[0].ToString();
+                        if (date.Contains("\r"))
+                            date = date.Replace("\r", "");
+                        if (date.Contains("\n"))
+                            date = date.Replace("\n", "");
+
+                        string message = logsArray[5].ToString();
+                        if (message.Contains("\r"))
+                            message = message.Replace("\r", "");
+                        if (message.Contains("\n"))
+                            message = message.Replace("\n", "");
+
+                        helperObject.TimeStamp = Convert.ToDateTime(date);
+                        helperObject.TypeOfLog = logsArray[1];
+                        helperObject.SourceOfLog = logsArray[2];
+                        helperObject.Functionality = logsArray[3];
+                        helperObject.UserName = logsArray[4];
+                        helperObject.Message = message;
+
+                        logsList.Add(helperObject);
+
+                    }
+                }
+            }
+            #endregion
+        }
+
+        private static void CheckDbVersionAndUpdate()
+        {
+            try
+            {
+                DataDB db = new DataDB(ConnectionType.SQLite, Session.ConnectionString, 3000);
+                DataTable dt = db.ReturnDataTable(QueryHelper.GetDbVersion());
+
+                //Adding scripts and version number in DbVersion list
+                //If any alteration is done in db then we will add the script in the list and execute it
+                List<DbVersion> dbVersionList = new List<DbVersion>();
+
+                #region Database Scripts
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForInvoiceHsn
+                }
+                       );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptforErrorLogs
+                }
+               );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForAlteringLogin
+                }
+               );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForLastSyncCustomerOutStandingInCompany
+                }
+               );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForLastSyncStockInCompany
+                }
+
+               );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForAlteringLoginForLogs
+                }
+
+               );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForOrderStatusCreation
+                }
+
+               );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForOrderStatusLineCreation
+                }
+
+               );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForAlteringCompanyForOrderStatus
+                }
+
+               );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForAlteringCustomerForGSTRegistrationtype
+                }
+
+               );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForAlteringCompanyForSalesOrderDeletionChceking
+                }
+
+               );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForAlteringCustomerOrderForTallyCompanyId
+                }
+
+              );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForAlteringCustomerPaymentForTallyCompanyId
+                }
+
+              );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForAddUpdateDetailsTable
+                }
+
+              );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForAddItemAliasColumnInItemTable
+                }
+
+              );
+                dbVersionList.Add(new DbVersion
+                {
+                    VersionNo = dbVersionNo,
+                    Script = DbEntities.ScriptForCreateTableSyncStatus
+                }
+
+              );
+                #endregion
+
+                int maxVersion = (dt.Rows.Count == 0 || string.IsNullOrEmpty(dt.Rows[0]["VersionNo"].ToString())) ? 0 : Convert.ToInt32(dt.Rows[0]["VersionNo"]);
+
+                if (dbVersionNo > maxVersion)
+                {
+                    foreach (DbVersion version in dbVersionList)
+                    {
+                        db.ReturnDataTable(version.Script);
+                    }
+                    db.ReturnDataTable(QueryHelper.SetDbVersion(dbVersionNo));
+                }
+                //else if (dt.Rows.Count == 0)
+                //{
+                //    db.ReturnDataTable(QueryHelper.SetDbVersion(dbVersionNo));
+                //}
+                dbVersionList.Clear();
+            }
+            catch (Exception ex)
+            {
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+
+        private static void CreateFolder(bool allUsers, string ConfigurationPath)
+        {
+            try
+            {
+                DirectoryInfo directoryInfo;
+                DirectorySecurity directorySecurity;
+                AccessRule rule;
+                //SecurityIdentifier securityIdentifier = new SecurityIdentifier
+                //    (WellKnownSidType.BuiltinUsersSid, null);
+                SecurityIdentifier securityIdentifier = new SecurityIdentifier
+                (WellKnownSidType.WorldSid, null);
+
+                if (!Directory.Exists(ConfigurationPath))
+                {
+                    if (allUsers)
+                    {
+                        bool modified;
+                        directoryInfo = Directory.CreateDirectory(ConfigurationPath);
+                        directorySecurity = directoryInfo.GetAccessControl();
+                        rule = new FileSystemAccessRule(
+                            securityIdentifier,
+                            FileSystemRights.Write |
+                            FileSystemRights.ReadAndExecute |
+                            FileSystemRights.FullControl,
+                            InheritanceFlags.ContainerInherit |
+                            InheritanceFlags.ObjectInherit,
+                            PropagationFlags.None,
+                            AccessControlType.Allow);
+                        directorySecurity.ModifyAccessRule(AccessControlModification.Add, rule, out modified);
+                        directoryInfo.SetAccessControl(directorySecurity);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+
+        private static void CreateFileForUrl(string dbDirectory)
+        {
+            try
+            {
+                if (Directory.Exists(dbDirectory))
+                {
+                    string baseUrlPath = Path.Combine(dbDirectory, "BaseUrl");
+                    string baseUrlFilePath = Path.Combine(baseUrlPath, "BaseUrl.txt");
+
+
+                    #region BaseUrl saving
+
+                    if (!Directory.Exists(baseUrlPath))
+                    {
+                        string fileName = "https://broker.beatroute.io/v1/";
+                        Directory.CreateDirectory(baseUrlPath);
+                        if (!File.Exists(baseUrlFilePath))
+                        {
+                            using (StreamWriter sw = File.CreateText(baseUrlFilePath))
+                            {
+                                sw.WriteLine(fileName);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (!File.Exists(baseUrlFilePath))
+                        {
+                            string fileName = "https://broker.beatroute.io/v1/";
+                            using (StreamWriter sw = File.CreateText(baseUrlFilePath))
+                            {
+                                sw.WriteLine(fileName);
+                            }
+                        }
+                    }
+
+                    #endregion
+
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+
+        public static void CheckForUpdate()
+        {
+            try
+            {
+
+                WebClient webClient = new WebClient();
+                string updateXml = webClient.DownloadString(VERSION_UPDATE_URL);
+                XmlDocument xmlDocument = new XmlDocument();
+                xmlDocument.LoadXml(updateXml);
+                XmlNode node = xmlDocument.SelectSingleNode("BeatrouteTallyConnector");
+                string versionNo = node.SelectSingleNode("VersionNo")?.InnerText;
+                string downloadUrl = node.SelectSingleNode("DownloadUrl")?.InnerText;
+                if (GetSvnCommitNo(VERSION_NO) < GetSvnCommitNo(versionNo))
+                {
+                    if (MessageBox.Show("An update is available. Do you want to download ?", "Update", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                    {
+                        string arguments = downloadUrl + " " + (string.IsNullOrEmpty(Session.UserName) ? "Not logged in" : Session.UserName);
+                        Process.Start(@".\BeatRouteTallyConnectorUpdate.exe",
+                            String.Join(" ", downloadUrl, (string.IsNullOrEmpty(Session.UserName) ? "\"Not logged in\"" : Session.UserName)));
+                        Application.Exit();
+
+                        #region Base URL creation After Update
+
+                        string dbDirectory = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\BeatrouteTallyIntegration\\Database";
+                        string baseUrlPath = dbDirectory + "\\BaseUrl";
+                        string baseUrlFileName = "BaseUrl.txt";
+                        string baseUrlCombinePath = Path.Combine(baseUrlPath, baseUrlFileName);
+                        if (File.Exists(baseUrlCombinePath))
+                        {
+                            File.Delete(baseUrlCombinePath);
+                            CreateFileForUrl(dbDirectory);
+                        }
+                        #endregion
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+
+            }
+        }
+
+        //Biplab Sharma - 12/7/2021 - Comparing Version number - after converting from String to Int value
+        private static int GetSvnCommitNo(string versionNo)
+        {
+            var versionArray = versionNo.Split('.');
+            if (versionArray.Length != 3)
+            {
+                logger.Fatal("ImportWorker|" + Session.UserName + "|Invalid version no: " + versionNo + "^" );
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+                return 0;
+            }
+            int version;
+            if (int.TryParse(versionArray[2], out version) == false)
+            {
+                logger.Fatal("ImportWorker|" + Session.UserName + "|Invalid version no: " + versionNo + "^");
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+                return 0;
+            }
+            else
+            {
+                return version;
+            }
+        }
+
+        //Biplab Sharma - 12/8/2021 - Adding Update details in database table
+        private static void AddUpdateDetails()
+        {
+            using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+            {
+                UpdateDetails updateDetails = new UpdateDetails();
+                //Checking If Null then add new value otherwise leave as it is
+                UpdateDetails update = uow.UpdateDetails.GetList().FirstOrDefault();
+                if (update == null)
+                {
+                    updateDetails.LastUpdateTime = new DateTime(2001, 01, 01);                    
+                    uow.UpdateDetails.Add(updateDetails);
+
+                    logger.Info("ImportWorker|" + Session.UserName + "|Update checking date and time " + updateDetails.LastUpdateTime + "^");
+                    logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                }
+            }
+        }
+
+        private static void SetSyncStatusValue(UnitOfWork uow, string ledgerKey)
+        {
+            SyncStatus syncStatus = uow.SyncStatus.GetList().Where(x => x.LedgerKey == ledgerKey).FirstOrDefault();
+            if (syncStatus == null)
+            {
+                syncStatus = new SyncStatus();
+                syncStatus.LedgerKey = ledgerKey;
+                syncStatus.LedgerValue = SyncStatusTextMessageHelper.Idle;
+                syncStatus.LedgerErrorStatus = "";
+
+                uow.SyncStatus.Add(syncStatus);
+            }
+        }
+    }
+}

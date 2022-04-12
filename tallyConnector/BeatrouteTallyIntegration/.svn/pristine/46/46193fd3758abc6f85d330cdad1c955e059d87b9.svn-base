@@ -1,0 +1,16 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationBase.API
+{
+    public class customerPostedPayment
+    {
+        public string beatroutePaymentId { get; set; }
+        public string companyId { get; set; }
+        public bool isPosted { get; set; }
+        public string message { get; set; }
+    }
+}

@@ -1,0 +1,488 @@
+﻿using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Dynamic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using static BeatrouteTallyIntegrationBase.Utils.Enum;
+using BeatrouteTallyIntegrationBase.Utils;
+using System.Reflection;
+using System.Net.Security;
+
+namespace BeatrouteTallyIntegrationBase.API
+{
+    public class RestUtility
+    {
+        #region Global variables
+
+        private static Logger _logger = LogManager.GetLogger("ApiLog");
+        private const string _APPLICATION_NAME = "invoicemanager";
+        private static ApiCall _apiCall;
+        public static string _groupId = string.Empty;
+        private static string _appTrackerUrl = "http://103.152.79.19:91/api/DemoTest/SetLogin";
+        private static string _windowsModel = string.Empty;
+        #endregion
+
+        public static bool GetToken(string userName, string password, string url)
+        {
+            try
+            {
+                //string method = "POST";
+
+                //Biplab Sharma - 30/11/2021 - Reading windows version
+                //Biplab Sharma - 21-03-2022 - Modifed the reading process by usinga separated helper class
+                #region Reading Windows Version
+
+                #region Old code - moved code in utils folder
+                //string subKey = @"SOFTWARE\Wow6432Node\Microsoft\Windows NT\CurrentVersion";
+                //Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine;
+                //Microsoft.Win32.RegistryKey skey = key.OpenSubKey(subKey);
+                //string windowsName = skey.GetValue("ProductName").ToString();
+
+                //if (windowsName == null)
+                //    windowsName = ""; 
+                #endregion
+
+                try
+                {
+                    _windowsModel = OSInfo.Name +" - "+OSInfo.Edition;
+                }
+                catch (Exception ex)
+                {
+                    _windowsModel = "ERROR";
+
+                    _logger.Fatal("Exception at reading windows version");
+                    _logger.Fatal("");
+                    _logger.Fatal(ex);
+                    _logger.Fatal("");
+                }
+
+                #endregion
+
+                dynamic requestBody = new ExpandoObject();
+                requestBody.username = userName;
+                requestBody.password = password;
+                requestBody.device = "tally";
+                requestBody.device_model = _windowsModel;
+                requestBody.ver = Session.VersionNo;
+
+                _apiCall = new ApiCall();
+                _apiCall.TimeStamp = DateTime.Now;
+                _apiCall.Api = "Token";
+                ApiResponse apiResponse = GetResponse(RequestType.POST.ToString(), requestBody, url, true);
+                apiResponse.Timestamp = _apiCall.TimeStamp;
+
+                #region Installation Tracker
+
+                //dynamic loginBody = new ExpandoObject();
+                //loginBody.AppName = StringFunctions.EncryptString("BeatRoute",Session.TRACKER_SALT);
+                //loginBody.Key = StringFunctions.EncryptString(userName,Session.TRACKER_SALT);
+                //JObject jsonRequest = JObject.FromObject(loginBody);
+
+                //ApiResponse loginTracking = GetResponse(RequestType.POST.ToString(), jsonRequest, appTrackerUrl, true);
+
+                #endregion
+
+                if (string.IsNullOrEmpty(apiResponse.Response) || string.IsNullOrWhiteSpace(apiResponse.Response))
+                {
+                    ErrorLogger.LogError(_logger, "Get Token", "ApiHelper|" + Session.UserName + "|Login failed for user " + userName + "^");
+                    return false;
+                }
+
+                JObject jsonObject = JObject.Parse(apiResponse.Response);
+
+                string token = string.Empty;
+
+                if (jsonObject != null)
+                {
+                    if (Convert.ToBoolean(jsonObject["success"]) == true)
+                    {
+                        //token = jsonObject["session"]["token"].ToString().Trim();
+                        token = jsonObject["token"].ToString().Trim();
+                        Session.Token = token;
+                        Session.UserName = requestBody.username;
+                        using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                        {
+                            Login user = uow.Login.GetList().Where(x => x.UserName == requestBody.username).FirstOrDefault();
+                            if (user != null)
+                            {
+                                user.Token = token;
+                                uow.Login.Update(user);
+                            }
+                            _logger.Info("ApiHelper|" + Session.UserName + "|User logged in successfully" + "^");
+                            _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                            return true;
+                        }
+                    }
+                    else
+                        return false;
+
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                return false;
+            }
+        }
+
+        #region API Core Methods
+        public static ApiResponse GetData(object requestBody, string url, RequestType requestType)
+        {
+            try
+            {
+                string method = RequestType.GET.ToString();
+                _apiCall = new ApiCall();
+                _apiCall.Api = requestType.ToString();
+                ApiResponse apiResponse = GetResponse(method, requestBody, url);
+
+                return apiResponse;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "Exception at RestUtility_GetData" + "^");
+                return new ApiResponse() { Timestamp = DateTime.Now, ExceptionMessage = ex.Message, ResponseCode = "0", Response = "" };
+            }
+        }
+
+        public static ApiResponse PostData(object requestBody, string url, RequestType requestType, bool isToken = false)
+        {
+            try
+            {
+                string method = RequestType.POST.ToString();
+                _apiCall = new ApiCall();
+                _apiCall.Api = requestType.ToString();
+                ApiResponse apiResponse = GetResponse(method, requestBody, url, isToken);
+
+                return apiResponse;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "Exception at RestUtility_PostData" + "^");
+                return new ApiResponse() { Timestamp = DateTime.Now, ExceptionMessage = ex.Message, ResponseCode = "0", Response = "" };
+            }
+        }
+
+        public static ApiResponse DeleteData(object requestBody, string url)
+        {
+            try
+            {
+                string method = RequestType.DELETE.ToString();
+
+                ApiResponse apiResponse = GetResponse(method, requestBody, url);
+
+                return apiResponse;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "Exception at RestUtility_PostData" + "^");
+                return new ApiResponse() { Timestamp = DateTime.Now, ExceptionMessage = ex.Message, ResponseCode = "0", Response = "" };
+            }
+        }
+
+        public static ApiResponse UpdateData(object requestBody, string url)
+        {
+            try
+            {
+                string method = RequestType.PUT.ToString();
+
+                ApiResponse apiResponse = GetResponse(method, requestBody, url);
+
+                return apiResponse;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "Exception at RestUtility_PostData" + "^");
+                return new ApiResponse() { Timestamp = DateTime.Now, ExceptionMessage = ex.Message, ResponseCode = "0", Response = "" };
+            }
+        }
+        #endregion
+
+        #region Helpers
+        private static ApiResponse GetResponse(string method, object requestBody, string url, bool isToken = false)
+        {
+            ServicePointManager.Expect100Continue = true;
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            HttpWebResponse response = null;
+            ApiResponse apiResponse = new ApiResponse();
+            try
+            {
+                string body = string.Empty;
+                if (requestBody != null)
+                {
+                    body = JsonConvert.SerializeObject(requestBody);                    
+                }
+                //if(body.Contains(@"\"))
+                //{
+                //    body = body.Replace(@"\","");
+                //}
+                _logger.Trace("ApiHelper|" + Session.UserName + "|" + body + "^");
+                _logger.Trace("ApiHelper|" + Session.UserName + "|" + "^");
+
+                //Session.Token = @"tU7QSkNLiDujP99ZfdhRqsNmF1jeKGsC";
+
+                //Session.ClientId = @"JY1t8gozNencB+FdSRrRkVGrYjeWyZxFBuybi0dumSc=";
+                //Session.ClientSecret = @"79393f09-3cbb-4035-b061-faa17c093ccd";
+                //if (_apiCall.Api == "SalesInvoice" || _apiCall.Api == "PurchaseInvoice")
+                //{
+                //    Uri newUrl = new Uri(url + "?groupId=" + _groupId);
+                //    url = newUrl.AbsoluteUri;
+                //}                
+
+
+                var webReq = (HttpWebRequest)WebRequest.Create(url);
+                webReq.Method = method;
+                webReq.Accept = "*/*";
+                webReq.ContentType = "application/json";
+                webReq.UserAgent = "BeatrouteTallyConnector";
+                if (!isToken)
+                {
+                    webReq.Headers["Authorization"] = "Bearer " + Session.Token;
+                    webReq.Headers["username"] = Session.UserName;
+                    webReq.Headers["device"] = "tally";
+                }
+
+
+                //webReq.Headers["Accept"] = "application/json";
+                //webReq.Headers["applicationName"] = Session.ApplicationName;
+
+                byte[] bytes = Encoding.ASCII.GetBytes(body);
+
+                webReq.ContentLength = bytes.Length;
+
+                if (method == RequestType.GET.ToString())
+                {
+                    var type = webReq.GetType();
+                    var currentMethod = type.GetProperty("CurrentMethod", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(webReq);
+
+                    var methodType = currentMethod.GetType();
+                    methodType.GetField("ContentBodyNotAllowed", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(currentMethod, false);
+
+                    ServicePointManager.ServerCertificateValidationCallback = new RemoteCertificateValidationCallback
+                                                                                (
+                                                                                   delegate { return true; }
+                                                                                );
+
+                    using (var os = webReq.GetRequestStream())
+                    {
+                        os.Write(bytes, 0, bytes.Length);
+
+                        os.Close();
+                    }
+                }
+                else
+                {
+                    using (var os = webReq.GetRequestStream())
+                    {
+                        os.Write(bytes, 0, bytes.Length);
+
+                        os.Close();
+                    }
+                }
+
+                _apiCall.TimeStamp = DateTime.Now;
+                _apiCall.Url = url;
+                _apiCall.Request = body;
+
+                response = (HttpWebResponse)webReq.GetResponse();
+
+                _apiCall.ResponseCode = response.StatusCode.ToString();
+                apiResponse.ResponseCode = response.StatusCode.ToString();
+                apiResponse.Timestamp = _apiCall.TimeStamp;
+                if (response == null)
+                {
+                    _logger.Error("ApiHelper|" + Session.UserName + "|" + "Response is null ....returning" + "^");
+                    _logger.Error("ApiHelper|" + Session.UserName + "|" + "^");
+                    return null;
+                }
+
+                var streamReader = new StreamReader(response.GetResponseStream());
+                var responseContent = streamReader.ReadToEnd().Trim();
+                _logger.Debug("ApiHelper|" + Session.UserName + "|" + "Response received - " + responseContent + "^");
+                apiResponse.Response = responseContent;
+                _apiCall.Response = responseContent;
+                apiResponse.ExceptionMessage = "";
+            }
+            catch (WebException webEx)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + webEx + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+
+                _apiCall.Response += webEx.Message;
+                _apiCall.ResponseCode = webEx.Status.ToString();
+                //string pageContent = new StreamReader(webEx.Response.GetResponseStream()).ReadToEnd().ToString();
+                apiResponse.ResponseCode = webEx.Status.ToString();
+                apiResponse.ExceptionMessage = webEx.Message;
+                apiResponse.Timestamp = _apiCall.TimeStamp;
+
+                return apiResponse;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+
+                _apiCall.Response += ex.Message;
+                _apiCall.ResponseCode = "0";
+
+                apiResponse.ResponseCode = "0";
+                apiResponse.ExceptionMessage = ex.Message;
+                apiResponse.Timestamp = _apiCall.TimeStamp;
+
+                return apiResponse;
+            }
+            finally
+            {
+                try
+                {
+                    using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                    {
+                        uow.ApiCall.Add(_apiCall);
+                        _logger.Info("ApiHelper|" + Session.UserName + "|" + _apiCall.Api + " - Api call saved in database" + "^");
+                        _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                    _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                }
+            }
+            return apiResponse;
+
+        }
+
+        //ToDo - Test with final values. Tested working in Postman with environment variables
+        #region Old Method not in use
+        public static ApiResponse GetToken(string method, string clientId, string clientSecret, string url)
+        {
+            HttpWebResponse response = null;
+            ApiResponse apiResponse = new ApiResponse();
+            try
+            {
+
+                var webReq = (HttpWebRequest)WebRequest.Create(url);
+                webReq.Method = method;
+                webReq.Accept = "application/json";
+                webReq.ContentType = "application/json";
+                webReq.Headers["X-Client-Id"] = clientId;
+                webReq.Headers["X-Client-Secret"] = clientSecret;
+
+                webReq.ContentLength = 0;
+
+                if (method == RequestType.GET.ToString())
+                {
+                    var type = webReq.GetType();
+                    var currentMethod = type.GetProperty("CurrentMethod", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(webReq);
+
+                    var methodType = currentMethod.GetType();
+                    methodType.GetField("ContentBodyNotAllowed", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(currentMethod, false);
+
+                    ServicePointManager.ServerCertificateValidationCallback = new RemoteCertificateValidationCallback
+                                                                                (
+                                                                                   delegate { return true; }
+                                                                                );
+
+                    //using (var os = webReq.GetRequestStream())
+                    //{
+                    //    os.Write(bytes, 0, 0);
+
+                    //    os.Close();
+                    //}
+                }
+                //else
+                //{
+                //    using (var os = webReq.GetRequestStream())
+                //    {
+                //        os.Write(null, 0, 0);
+
+                //        os.Close();
+                //    }
+                //}
+                _apiCall = new ApiCall();
+                _apiCall.TimeStamp = DateTime.Now;
+                _apiCall.Url = url;
+                _apiCall.Api = "Login";
+
+                response = (HttpWebResponse)webReq.GetResponse();
+                _apiCall.ResponseCode = response.StatusCode.ToString();
+                apiResponse.ResponseCode = response.StatusCode.ToString();
+                apiResponse.Timestamp = _apiCall.TimeStamp;
+                if (response == null)
+                {
+                    _logger.Error("ApiHelper|" + Session.UserName + "|" + "Response is null ....returning" + "^");
+                    _logger.Error("ApiHelper|" + Session.UserName + "|" + "^");
+                    return null;
+                }
+
+                var streamReader = new StreamReader(response.GetResponseStream());
+                var responseContent = streamReader.ReadToEnd().Trim();
+                _logger.Debug("ApiHelper|" + Session.UserName + "|" + "Response received - " + responseContent + "^");
+                apiResponse.Response = responseContent;
+                _apiCall.Response = responseContent;
+                apiResponse.ExceptionMessage = "";
+            }
+            catch (WebException webEx)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + webEx + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+
+                _apiCall.Response += webEx.Message;
+                _apiCall.ResponseCode = webEx.Status.ToString();
+                //string pageContent = new StreamReader(webEx.Response.GetResponseStream()).ReadToEnd().ToString();
+                apiResponse.ResponseCode = webEx.Status.ToString();
+                apiResponse.ExceptionMessage = webEx.Message;
+                apiResponse.Timestamp = _apiCall.TimeStamp;
+
+                return apiResponse;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+
+                _apiCall.Response += ex.Message;
+                _apiCall.ResponseCode = "0";
+
+                apiResponse.ResponseCode = "0";
+                apiResponse.ExceptionMessage = ex.Message;
+                apiResponse.Timestamp = _apiCall.TimeStamp;
+
+                return apiResponse;
+            }
+            finally
+            {
+                try
+                {
+                    using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                    {
+                        uow.ApiCall.Add(_apiCall);
+                        _logger.Info("ApiHelper|" + Session.UserName + "|" + _apiCall.Api + " - Api call saved in database" + "^");
+                        _logger.Info("ApiHelper|" + Session.UserName + "|" + "^");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Fatal("ApiHelper|" + Session.UserName + "|" + ex + "^");
+                    _logger.Fatal("ApiHelper|" + Session.UserName + "|" + "^");
+                }
+            }
+            return apiResponse;
+
+        } 
+        #endregion
+
+        #endregion
+    }
+}

@@ -1,0 +1,18 @@
+﻿using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.Models.ViewModels;
+using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.BusinessRepository.Interface
+{
+    public interface IErrorLogRepository : IRepository<ErrorLog>
+    {
+        IEnumerable<ErrorLogViewModel> GetErrorLogTopData();
+
+        IEnumerable<ErrorLogViewModel> GetErrorLogFullData();
+    }
+}

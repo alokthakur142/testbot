@@ -1,0 +1,21 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationBase.Utils
+{
+    public class Enum
+    {
+        public enum RequestType
+        {
+            Company, Payment, Invoice, Ageing, Group, Vendor, Bank, GetSettings, PostSettings, Item, Customer, SalesInvoice, CustomerOutstanding, Stock, CustomerPaymentPostingConfirmation, CustomerPostedPayment, CustomerPayment, CustomerOrder, GetCustomerOrder, GetCustomerPayment, GET, POST, PUT, DELETE, Logs, PostOrderStatus
+        }
+
+        public enum ApiType
+        {
+            login,setting,items,customerOrder,tally,salesInvoice,customerOutstanding,customers,stock,customerPayment,customerPaymentPostingConfirmation,customerPostedPayment,getCustomerOrder,getCustomerPayment, logs, postOrderStatus
+        }
+    }
+}

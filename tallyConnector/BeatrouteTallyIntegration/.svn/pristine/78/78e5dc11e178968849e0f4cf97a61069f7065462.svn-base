@@ -1,0 +1,66 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationBase.API
+{
+    public class salesInvoice
+    {
+        public salesInvoice()
+        {
+            salesInvoiceLinesItemList = new List<salesInvoiceitemLines>();
+            taxesAndChargesLinesList = new List<taxesAndChargesLines>();
+        }
+
+        public string salesInvoiceId { get; set; }
+        public string beatrouteOrderId { get; set; }
+        public string transactionType { get; set; }
+        public string originalInvoiceNo { get; set; }
+        public string companyId { get; set; }
+        public DateTime originalInvoiceDate { get; set; }
+        public string voucherType { get; set; }
+        public string salesInvoiceNo { get; set; }
+        public DateTime salesInvoiceDate { get; set; }
+        public string customerId { get; set; }
+        public string buyerCustomerName { get; set; }
+        public string buyerAddress1 { get; set; }
+        public string buyerAddress2 { get; set; }
+        public string buyerAddress3 { get; set; }
+        public string buyerState { get; set; }
+        public string buyerGstin { get; set; }
+        public string shipToCustomerName { get; set; }
+        public string shipToAddress1 { get; set; }
+        public string shipToAddress2 { get; set; }
+        public string shipToAddress3 { get; set; }
+        public string shipToState { get; set; }
+        public string shipToGstin { get; set; }
+        public string paymentTerms { get; set; }
+        public string narration { get; set; }
+
+        public List<salesInvoiceitemLines> salesInvoiceLinesItemList;
+        public List<taxesAndChargesLines> taxesAndChargesLinesList;
+    }
+
+    public class salesInvoiceitemLines
+    {
+        public string itemId { get; set; }
+        public string itemName { get; set; }
+        public string ledgerName { get; set; }
+        public decimal qty { get; set; }
+        public decimal rate { get; set; }
+        public decimal discount { get; set; }
+        public decimal amount { get; set; }
+        public decimal taxRate { get; set; }
+        public string hsnCode { get; set; }
+    }
+
+    public class taxesAndChargesLines
+    {
+        public string ledgerName { get; set; }
+        public string taxType { get; set; }
+        public decimal percentageRate { get; set; }
+        public decimal amount { get; set; }
+    }
+}

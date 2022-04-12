@@ -1,0 +1,490 @@
+﻿using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationBase.Helpers;
+using BeatrouteTallyIntegrationBase.Tally;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using NLog;
+using OrchidData.Transactions;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Transactions;
+using System.Xml;
+
+namespace BeatrouteTallyIntegrationBase.Export
+{
+    public class ExportController
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+        private static Logger _httpLogger = LogManager.GetLogger("HttpLog");
+        private static Logger _salesOrderLogger = LogManager.GetLogger("SalesOrderLog");
+        private static int _errorCount = 0;
+
+
+        public string PostCustomerOrderToTally(CustomerOrder customerOrder)
+        {
+            _logger.Info("ImportWorker|" + Session.UserName + "|" +String.Format("Starting posting Customer Order to Tally: {0} dt. {1}., Order ID: {2}", customerOrder.OrderNo, customerOrder.OrderDate, customerOrder.OrderId) + "^");
+            _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+            string postingMessage = string.Empty;
+
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    Company company = uow.Company.GetList().Where(x => x.Guid == customerOrder.CompanyId && x.Guid == customerOrder.TallyCompanyId).FirstOrDefault();
+                    SyncStatus postStatusForSalesOrder = GetSyncStatusObject(uow, SyncStatusTextMessageHelper.SalesOrders);
+                    SaveSyncStatusInDb(uow, postStatusForSalesOrder, SyncStatusCondition.PostStarting);
+
+                    Voucher voucher = new Voucher();
+                    voucher.VOUCHERTYPENAME = "Sales Order";
+                    voucher.REMOTEID = "Sales Order-" + customerOrder.OrderId;
+                    voucher.EFFECTIVEDATE = customerOrder.ImportedOn.Date;
+                    voucher.REFERENCEDATE = customerOrder.OrderDate.Date;
+                    voucher.BILLOFLADINGDATE = customerOrder.ImportedOn.Date;
+                    voucher.PARTYLEDGERNAME = customerOrder.CustomerName;
+                    voucher.ISINVOICE = true;
+                    voucher.PERSISTEDVIEW = "Invoice Voucher View";
+
+                    voucher.REFERENCE = customerOrder.OrderNo;
+                    voucher.DATE = customerOrder.OrderDate;
+                    voucher.PARTYNAME = customerOrder.CustomerName;
+                    voucher.BASICDUEDATEOFPYMT = customerOrder.TermsOfPayment;
+                    voucher.BASICORDERREF = customerOrder.OtherReference;
+                    voucher.BASICORDERTERMS = customerOrder.TermsOfDelivery;
+                    voucher.BASICSHIPPEDBY = customerOrder.DespatchThrough;
+                    voucher.BASICFINALDESTINATION = customerOrder.Destination;
+
+                    voucher.BASICBASEPARTYNAME = customerOrder.BuyerCustomerName;
+                    voucher.ADDRESS.Add(customerOrder.BuyerCustomerAddress1);
+                    voucher.ADDRESS.Add(customerOrder.BuyerCustomerAddress2);
+                    voucher.ADDRESS.Add(customerOrder.BuyerCustomerAddress3);
+                    voucher.STATENAME = customerOrder.BuyerState;
+                    voucher.PARTYGSTIN = customerOrder.BuyerGstin;
+
+                    voucher.BASICBUYERNAME = customerOrder.ShipToCustomerName;
+                    voucher.BASICBUYERADDRESS.Add(customerOrder.ShipToAddress1);
+                    voucher.BASICBUYERADDRESS.Add(customerOrder.ShipToAddress2);
+                    voucher.BASICBUYERADDRESS.Add(customerOrder.ShipToAddress3);
+                    voucher.CONSIGNEESTATENAME = customerOrder.ShipToState;
+                    voucher.CONSIGNEEGSTIN = customerOrder.ShipToGstin;
+
+                    voucher.NARRATION = customerOrder.Narration;
+
+                    List<CustomerOrderItemLines> itemLines = uow.CustomerOrderItemLines.GetList().Where(x => x.CompanyId == customerOrder.CompanyId && x.OrderId == customerOrder.OrderId).ToList();
+
+                    decimal totalAmount = 0;
+
+                    foreach (CustomerOrderItemLines line in itemLines)
+                    {
+                        totalAmount += line.Amount;
+                    }
+
+                    LedgerEntry ledgerEntry1 = new LedgerEntry();
+                    ledgerEntry1.LEDGERNAME = customerOrder.CustomerName;
+                    ledgerEntry1.AMOUNT = new OrchidData.Utils.TallyAmount { BaseCurrencyAmount = totalAmount * -1 };
+                    ledgerEntry1.ISDEEMEDPOSITIVE = true;
+                    ledgerEntry1.ISPARTYLEDGER = true;
+
+                    voucher.LEDGERENTRIESLIST.Add(ledgerEntry1);
+
+                    foreach (CustomerOrderItemLines item in itemLines)
+                    {
+                        Items itemUom = uow.Items.GetList().Where(x => x.CompanyId == company.Guid && x.ItemId == item.ItemId).FirstOrDefault();
+                        if (itemUom == null)
+                        {
+                            ErrorLogger.LogError(_logger, "Post Costomer Order to Tally", "ImportWorker|" + Session.UserName + "|Item ID - " + item.Id + ", Item Name - " + item.ItemName + " is not synced for Company - " + company.CompanyName +", Order No - "+customerOrder.OrderNo +", Order Date - "+customerOrder.OrderDate + "^");
+                            continue;
+                        }
+                        var uom = itemUom.UnitOfMeasure;
+
+                        InventoryEntry inventoryEntry = new InventoryEntry();
+
+                        inventoryEntry.STOCKITEMNAME = itemUom.ItemName;    //Subhabrata 27-Sep-2021 : Assigning item name from item object
+                        inventoryEntry.AMOUNT = new OrchidData.Utils.TallyAmount { BaseCurrencyAmount = item.Amount };
+                        inventoryEntry.ACTUALQTY = new OrchidData.Utils.TallyQuantity { Quantity = item.Qty, UOM = uom };
+                        inventoryEntry.BILLEDQTY = new OrchidData.Utils.TallyQuantity { Quantity = item.Qty, UOM = uom };
+                        inventoryEntry.RATE = new OrchidData.Utils.TallyRate { Rate = new OrchidData.Utils.TallyAmount { BaseCurrencyAmount = item.Rate }, UOM = uom };
+
+                        BatchAllocation batchAllocation = new BatchAllocation();
+                        batchAllocation.ACTUALQTY = new OrchidData.Utils.TallyQuantity { Quantity = item.Qty, UOM = uom };
+                        batchAllocation.BILLEDQTY = new OrchidData.Utils.TallyQuantity { Quantity = item.Qty, UOM = uom };
+                        batchAllocation.AMOUNT = new OrchidData.Utils.TallyAmount { BaseCurrencyAmount = item.Amount };
+                        batchAllocation.ORDERDUEDATE = item.DueDate.ToString("dd-MMM-yyyy");
+                        batchAllocation.MFDON = DateTime.Now;
+
+                        inventoryEntry.BATCHALLOCATIONSLIST.Add(batchAllocation);
+
+                        voucher.ALLINVENTORYENTRIESLIST.Add(inventoryEntry);
+                    }
+
+
+                    #region Tally posting
+
+                    string xml = OrchidConnector.TallyUtils.TallyUtil.GenerateVoucherXml(company.CompanyName, voucher, "CREATE");
+                    _httpLogger.Trace(xml);
+                    _httpLogger.Trace("");
+
+                    TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+
+                    if (!tallyConn.IsTallyOpen())
+                    {
+                        postingMessage = "Tally is not open for IP: " + Session.TallyIp + ", PORT: " + Session.TallyPort;
+                        ErrorLogger.LogError(_logger, "Post Customer Order to Tally", "ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+                        SaveSyncStatusInDb(uow, postStatusForSalesOrder, SyncStatusCondition.TallyPostingError);
+                        _salesOrderLogger.Info("ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+                        _salesOrderLogger.Info("");
+                        return postingMessage;
+                    }
+
+                    Session.TallyIsEducational = false; //To-Do uncomment 
+                    if (tallyConn.IsTallyEducational())
+                    {
+                        Session.TallyIsEducational = true;
+                        postingMessage = "Posting failed! Tally is running in educational mode for IP: " + Session.TallyIp + ", PORT: " + Session.TallyPort;
+                        ErrorLogger.LogError(_logger, "Post Customer Order to Tally", "ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+                        SaveSyncStatusInDb(uow, postStatusForSalesOrder, SyncStatusCondition.TallyPostingError);
+                        _salesOrderLogger.Info("ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+                        _salesOrderLogger.Info("");
+                        return postingMessage;
+                    }
+
+                    string responseXml = tallyConn.XMLRequest(xml);
+
+                    responseXml = tallyConn.CleanInvalidXmlChars(responseXml);
+
+                    _httpLogger.Trace("Customer Order response xml");
+                    _httpLogger.Trace(responseXml);
+                    _httpLogger.Trace("");
+
+                    XmlDocument xmlDoc = new XmlDocument();
+
+                    if (responseXml.Contains("<CREATED>1") || responseXml.Contains("<ALTERED>1"))
+                    {
+                        string TallyVoucherID = String.Empty;
+                        xmlDoc.LoadXml(responseXml);
+                        XmlNodeList nodes = xmlDoc.GetElementsByTagName("LASTVCHID");
+                        if (nodes.Count > 0)
+                            TallyVoucherID = nodes[0].InnerText;
+                        postingMessage = "Voucher successfully posted: Voucher Id - " + TallyVoucherID;
+                        _logger.Info("ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+                        customerOrder.IsPosted = true;
+                        customerOrder.PostedOn = DateTime.Now;
+                        customerOrder.PostingMessage = postingMessage;
+                        customerOrder.RetryCount++;
+                        _logger.Info("ImportWorker|" + Session.UserName + "|Voucher with Voucher Id - " +TallyVoucherID+" posted to Tally successfully" + "^");
+                        _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                        SaveSyncStatusInDb(uow, postStatusForSalesOrder, SyncStatusCondition.PostEnded);
+                    }
+                    else if (responseXml.Contains("LINEERROR"))
+                    {
+                        xmlDoc.LoadXml(responseXml);
+                        XmlNodeList nodes = xmlDoc.GetElementsByTagName("LINEERROR");
+                        postingMessage = nodes[0].InnerText;
+
+                        //Subhabrata 27-Sep-2021 : Error messages concatenated
+                        if (totalAmount == 0)
+                            postingMessage = postingMessage + " - The order amount is zero and could not be posted";
+                        if (itemLines.Count == 0)
+                            postingMessage = postingMessage + " - The order does not have any line items";
+
+                        customerOrder.IsPosted = false;
+                        customerOrder.PostedOn = DateTime.Now;
+                        customerOrder.PostingMessage = postingMessage;
+                        customerOrder.RetryCount++;
+                        ErrorLogger.LogError(_logger, "Post Customer Order to Tally", "ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+
+                        SaveSyncStatusInDb(uow, postStatusForSalesOrder, SyncStatusCondition.TallyPostingError);
+                        _salesOrderLogger.Info("ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+                        _salesOrderLogger.Info("");
+
+                    }
+                    else if (responseXml.ToUpper().Contains("ERROR IN XML"))
+                    {
+                        responseXml = responseXml + "Tally is not running or could not connect to Tally";
+                        customerOrder.IsPosted = false;
+                        customerOrder.PostedOn = DateTime.Now;
+                        customerOrder.PostingMessage = postingMessage;
+                        customerOrder.RetryCount++;
+                        ErrorLogger.LogError(_logger, "Post Customer Order to Tally", "ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+                        SaveSyncStatusInDb(uow, postStatusForSalesOrder, SyncStatusCondition.TallyPostingError);
+                        _salesOrderLogger.Info("ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+                        _salesOrderLogger.Info("");
+                    }
+                    else if (responseXml.Contains("<RESPONSE>Unknown Request"))
+                    {
+                        postingMessage = "Unknown request";
+                        customerOrder.IsPosted = false;
+                        customerOrder.PostedOn = DateTime.Now;
+                        customerOrder.PostingMessage = postingMessage;
+                        customerOrder.RetryCount++;
+                        ErrorLogger.LogError(_logger, "Post Customer Order to Tally", postingMessage + "^");
+                        SaveSyncStatusInDb(uow, postStatusForSalesOrder, SyncStatusCondition.TallyPostingError);
+                        _salesOrderLogger.Info("ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+                        _salesOrderLogger.Info("");
+                    }
+
+                    #endregion
+
+                    uow.CustomerOrder.Update(customerOrder);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+
+            return postingMessage;
+        }
+        public string PostCustomerPaymentToTally(CustomerPayment customerPayment)
+        {
+            _logger.Info("ImportWorker|" + Session.UserName + "|" +String.Format("Starting posting Customer payment to Tally: {0} dt. {1}., Customer payment ID: {2}", customerPayment.PaymentReference, customerPayment.PaymentDate, customerPayment.PaymentId) + "^");
+            _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+            string postingMessage = string.Empty;
+
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    Company company = uow.Company.GetList().Where(x => x.Guid == customerPayment.CompanyId).FirstOrDefault();
+
+                    #region Create Voucher for Tally Posting
+
+                    Voucher voucher = new Voucher();
+                    voucher.DATE = customerPayment.PaymentDate;
+                    voucher.REFERENCE = customerPayment.PaymentReference;
+                    voucher.REFERENCEDATE = customerPayment.ReferenceDate;
+                    voucher.VOUCHERTYPENAME = "Receipt";
+                    voucher.NARRATION = customerPayment.Narration;
+                    voucher.REMOTEID = "Receipt-" + customerPayment.PaymentId;
+                    voucher.ISINVOICE = false;
+                    voucher.PERSISTEDVIEW = "Accounting Voucher View";
+                    voucher.EFFECTIVEDATE = customerPayment.ImportedOn.Date;
+                    voucher.BILLOFLADINGDATE = customerPayment.ImportedOn.Date;
+                    voucher.PARTYLEDGERNAME = customerPayment.CustomerName;
+                    voucher.ISOPTIONAL = true;
+
+                    decimal totalAmount = 0;
+
+                    var billReferencesLines = uow.BillReferences.GetList().Where(x => x.CompanyId == customerPayment.CompanyId && x.CustomerPaymentId == customerPayment.PaymentId).ToList();
+                    foreach (BillReferences line in billReferencesLines)
+                        totalAmount += line.BillReferenceAmount;
+
+                    LedgerEntry ledgerEntry1 = new LedgerEntry();
+                    ledgerEntry1.LEDGERNAME = customerPayment.CustomerName;
+                    //bool isCustomerDebit = totalAmount > 0 ? true : false;
+                    bool isCustomerDebit = totalAmount < 0 ? true : false;
+                    ledgerEntry1.AMOUNT = new OrchidData.Utils.TallyAmount { BaseCurrencyAmount = totalAmount < 0 ? totalAmount * -1 : totalAmount };
+                    //ledgerEntry1.AMOUNT = new OrchidData.Utils.TallyAmount { BaseCurrencyAmount = totalAmount > 0 ? totalAmount: totalAmount * -1 };
+                    ledgerEntry1.ISDEEMEDPOSITIVE = isCustomerDebit;
+                    ledgerEntry1.ISPARTYLEDGER = true;
+                    //Subhabrata 24-Sep-2021 : Changes for bill references
+                    foreach (BillReferences bill in billReferencesLines)
+                    {
+                        ledgerEntry1.BILLALLOCATIONSLIST = new List<BillAllocation>();
+                        ledgerEntry1.BILLALLOCATIONSLIST.Add(new BillAllocation
+                        {
+                            NAME = customerPayment.CustomerName,
+                            BILLTYPE = "New Ref",
+                            AMOUNT = new OrchidData.Utils.TallyAmount { BaseCurrencyAmount = totalAmount < 0 ? totalAmount * -1 : totalAmount }
+                        });
+                    }
+
+                    voucher.ALLLEDGERENTRIESLIST.Add(ledgerEntry1);
+                    //decimal totalAmount2 = 0;
+                    //var billReferencesLines2 = uow.BillReferences.GetList().Where(x => x.CompanyId == customerPayment.CompanyId && x.CustomerPaymentId == customerPayment.PaymentId).ToList();
+                    //foreach (BillReferences line in billReferencesLines)
+                    //    totalAmount2 += line.BillReferenceAmount;
+
+                    LedgerEntry ledgerEntry2 = new LedgerEntry();
+                    ledgerEntry2.LEDGERNAME = customerPayment.CashOrBankName;
+                    bool isCustomer2Debit = totalAmount > 0 ? true : false;
+                    //bool isCustomer2Debit = totalAmount2 > 0 ? false : true;
+                    ledgerEntry2.AMOUNT = new OrchidData.Utils.TallyAmount { BaseCurrencyAmount = totalAmount > 0 ? totalAmount * -1 : totalAmount };
+                    ledgerEntry2.ISDEEMEDPOSITIVE = isCustomer2Debit;
+                    ledgerEntry2.ISPARTYLEDGER = true;
+
+                    BankAllocation bank = new BankAllocation();
+                    bank.NAME = customerPayment.CashOrBankName;
+                    bank.INSTRUMENTDATE = customerPayment.PaymentDate;
+                    bank.TRANSACTIONTYPE = customerPayment.PaymentType;
+                    bank.DATE = customerPayment.ImportedOn.Date;
+                    bank.PAYMENTMODE = "Transacted";
+                    bank.BANKERSDATE = customerPayment.PaymentDate;
+                    bank.BANKPARTYNAME = customerPayment.CustomerName;
+                    bank.AMOUNT = new OrchidData.Utils.TallyAmount { BaseCurrencyAmount = totalAmount > 0 ? totalAmount * -1 : totalAmount };
+
+                    ledgerEntry2.BANKALLOCATIONSLIST.Add(bank);
+                    //foreach (BillReferences bill in billReferencesLines)
+                    //{
+                    //    ledgerEntry2.BILLALLOCATIONSLIST = new List<BillAllocation>();
+                    //    ledgerEntry2.BILLALLOCATIONSLIST.Add(new BillAllocation
+                    //    {
+                    //        NAME = bill.BillReferenceNo,
+                    //        BILLTYPE = "New Ref",
+                    //        AMOUNT = new OrchidData.Utils.TallyAmount { BaseCurrencyAmount = totalAmount > 0 ? totalAmount * -1 : totalAmount }
+                    //    });
+                    //}
+                    voucher.ALLLEDGERENTRIESLIST.Add(ledgerEntry2);
+
+                    #endregion
+
+                    #region Tally posting
+
+                    string xml = OrchidConnector.TallyUtils.TallyUtil.GenerateVoucherXml(company.CompanyName, voucher, "CREATE");
+                    _httpLogger.Trace(xml);
+                    _httpLogger.Trace("");
+                    TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);                    
+
+                    if (!tallyConn.IsTallyOpen())
+                    {
+                        postingMessage = "Tally is not open for IP: " + Session.TallyIp + ", PORT: " + Session.TallyPort;
+                        ErrorLogger.LogError(_logger, "Post Customer Payment to Tally", "ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+                        return postingMessage;
+                    }
+
+                    Session.TallyIsEducational = false;
+                    if (tallyConn.IsTallyEducational())
+                    {
+                        Session.TallyIsEducational = true;
+                        postingMessage = "Posting failed! Tally is running in educational mode for IP: " + Session.TallyIp + ", PORT: " + Session.TallyPort;
+                        ErrorLogger.LogError(_logger, "Post Customer Payment to Tally", "ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+                        return postingMessage;
+                    }
+
+                    string responseXml = tallyConn.XMLRequest(xml);
+
+                    responseXml = tallyConn.CleanInvalidXmlChars(responseXml);
+
+                    _httpLogger.Trace("Customer Payment response xml");
+                    _httpLogger.Trace(responseXml);
+                    _httpLogger.Trace("");
+
+                    XmlDocument xmlDoc = new XmlDocument();
+
+                    if (responseXml.Contains("<CREATED>1") || responseXml.Contains("<ALTERED>1"))
+                    {
+                        string TallyVoucherID = String.Empty;
+                        xmlDoc.LoadXml(responseXml);
+                        XmlNodeList nodes = xmlDoc.GetElementsByTagName("LASTVCHID");
+                        if (nodes.Count > 0)
+                            TallyVoucherID = nodes[0].InnerText;
+                        postingMessage = "Voucher successfully posted: Voucher Id - " + TallyVoucherID;
+                        _logger.Info("ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+                        customerPayment.IsPosted = true;
+                        customerPayment.PostedOn = DateTime.Now;
+                        customerPayment.PostingMessage = postingMessage;
+                        customerPayment.RetryCount++;
+                        _logger.Info("ImportWorker|" + Session.UserName + "|Voucher with Voucher Id - " +TallyVoucherID+" posted successfully to Tally" + "^");
+                        _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                    }
+                    else if (responseXml.Contains("LINEERROR"))
+                    {
+                        xmlDoc.LoadXml(responseXml);
+                        XmlNodeList nodes = xmlDoc.GetElementsByTagName("LINEERROR");
+                        postingMessage = nodes[0].InnerText;
+                        customerPayment.IsPosted = false;
+                        customerPayment.PostedOn = DateTime.Now;
+                        customerPayment.PostingMessage = postingMessage;
+                        customerPayment.RetryCount++;
+                        ErrorLogger.LogError(_logger, "Post Customer Payment to Tally", "ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+
+                    }
+                    else if (responseXml.ToUpper().Contains("ERROR IN XML"))
+                    {
+                        responseXml = responseXml + "Tally is not running or could not connect to Tally";
+                        customerPayment.IsPosted = false;
+                        customerPayment.PostedOn = DateTime.Now;
+                        customerPayment.PostingMessage = postingMessage;
+                        customerPayment.RetryCount++;
+                        ErrorLogger.LogError(_logger, "Post Customer Payment to Tally", "ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+                    }
+                    else if (responseXml.Contains("<RESPONSE>Unknown Request"))
+                    {
+                        postingMessage = "Unknown request";
+                        customerPayment.IsPosted = false;
+                        customerPayment.PostedOn = DateTime.Now;
+                        customerPayment.PostingMessage = postingMessage;
+                        customerPayment.RetryCount++;
+                        ErrorLogger.LogError(_logger, "Post Customer Payment to Tally", "ImportWorker|" + Session.UserName + "|" + postingMessage + "^");
+                    }
+
+                    #endregion
+
+                    uow.CustomerPayment.Update(customerPayment);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+
+            return postingMessage;
+        }
+
+        #region Methods
+        private static SyncStatus GetSyncStatusObject(UnitOfWork uow, string ledgerKey)
+        {
+            var syncStatusObject = uow.SyncStatus.GetList().Where(x => x.LedgerKey == ledgerKey).FirstOrDefault();
+            return syncStatusObject;
+        }
+
+        private static void SaveSyncStatusInDb(UnitOfWork uow, SyncStatus syncStatus, SyncStatusCondition syncStatusCondition)
+        {
+            switch (syncStatusCondition)
+            {
+                case SyncStatusCondition.PostStarting:
+                    if (syncStatus != null)
+                    {
+                        syncStatus.LedgerValue = SyncStatusTextMessageHelper.SalesOrderPostProgress;
+                        syncStatus.LedgerErrorStatus = "";
+                        uow.SyncStatus.Update(syncStatus);
+                    }
+                    break;
+                case SyncStatusCondition.TallyPostingError:
+                    if (syncStatus != null)
+                    {
+                        _errorCount++;
+                        syncStatus.LedgerValue = SyncStatusTextMessageHelper.SalesOrderPostWithError;
+                        if (_errorCount > 1)
+                        {
+                            syncStatus.LedgerErrorStatus = _errorCount + SyncStatusTextMessageHelper.PluralErrorText;
+                        }
+                        else
+                            syncStatus.LedgerErrorStatus = _errorCount + SyncStatusTextMessageHelper.SingularErrorText;
+
+                        uow.SyncStatus.Update(syncStatus);
+                    }
+                    break;
+                case SyncStatusCondition.PostEnded:
+                    if (syncStatus != null)
+                    {
+                        syncStatus.LedgerValue = SyncStatusTextMessageHelper.SalesOrderPostWithoutError;
+                        syncStatus.LedgerErrorStatus = "";
+                        uow.SyncStatus.Update(syncStatus);
+                    }
+                    break;
+                
+                default:
+                    break;
+
+            }
+        }
+
+        #endregion
+
+        #region Enums
+
+        private enum SyncStatusCondition
+        {
+            PostStarting,
+            PostEnded,
+            TallyPostingError            
+        }
+
+        #endregion
+    }
+}

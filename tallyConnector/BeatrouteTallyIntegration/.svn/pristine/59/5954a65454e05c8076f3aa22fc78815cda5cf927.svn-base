@@ -1,0 +1,299 @@
+﻿using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationBase.Export;
+using BeatrouteTallyIntegrationBase.Import;
+using BeatrouteTallyIntegrationBase.Tally;
+using BeatrouteTallyIntegrationBase.Utils;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using NLog;
+using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Security.AccessControl;
+using System.Security.Principal;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace BeatrouteTallyIntegrationTest
+{
+    public partial class TestForm : Form
+    {
+        private static Logger _logger = LogManager.GetCurrentClassLogger();
+
+        public TestForm()
+        {
+            InitializeComponent();
+
+            this.TopMost = false;
+            this.ShowInTaskbar = true;
+            this.FormBorderStyle = FormBorderStyle.Fixed3D;
+
+            //Session.TallyPort = "9001";
+            Session.TallyPort = "9000";
+            Session.TallyIp = "localhost";
+        }
+
+        private void TestForm_Load(object sender, EventArgs e)
+        {
+            try
+            {
+                Session.TallyIp = "localhost";
+                //Session.TallyPort = "9001";
+                Session.TallyPort = "9000";
+                TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+
+                if (tallyConn.IsTallyOpen())
+                {
+                    cmbCompanyName.Items.Clear();
+                    string[] compNames = tallyConn.GetCompaniesOpenInTally();
+                    foreach (string comp in compNames)
+                    {
+                        if (!string.IsNullOrEmpty(comp))
+                        {
+                            cmbCompanyName.Items.Add(comp);
+                        }
+                    }
+
+                    cmbCompanyName.SelectedItem = cmbCompanyName.Items[0];
+                }
+
+                //Create db in ProgramData
+                string dbName = "BeatrouteTallyIntegration.db";
+                string FileCopy = Application.StartupPath + "\\Database\\" + dbName;
+                //string FileCopy = Path.Combine(@"E:\Pragyajeet\Projects\BeatrouteTallyIntegration\BeatrouteTallyIntegrationTest\Database", dbName);
+                _logger.Info(FileCopy);
+                string dbDirectory = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\BeatrouteTallyIntegration\\Database";
+                string NewCopy = Path.Combine(dbDirectory, dbName);
+                if (!File.Exists(NewCopy))
+                {
+                    _logger.Info("Creating folder");
+                    CreateFolder(true, dbDirectory);
+                    File.Copy(FileCopy, NewCopy);
+                    UnitOfWork.SetConnectionString(NewCopy);
+
+                }
+
+                RefreshGrid();
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal(ex);
+                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void RefreshGrid()
+        {
+            try
+            {
+                //string connStr = ConfigurationManager.ConnectionStrings["ConnectionString"].ConnectionString;
+                //string connStr = "data source=" + Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) + "\\Database\\XpedizeTallyIntegration.db";
+                using (UnitOfWork uow = new UnitOfWork(UnitOfWork.GetConnectionString(), ConnectionType.SQLite))
+                {
+                    var compModel = uow.Company.GetList();
+                    dataGridView1.DataSource = new BindingSource { DataSource = compModel };
+
+                    //var invoiceModel = uow.SalesInvoice.GetList();
+                    //var invoiceLinesModel = uow.SalesInvoiceItemLines.GetList();
+                    //dataGridViewSalesInvoices.DataSource = new BindingSource { DataSource = invoiceModel };
+                    //dataGridViewSalesInvoiceItemLines.DataSource = new BindingSource { DataSource = invoiceLinesModel };
+
+                    //var itemsModel = uow.Items.GetList();
+                    //dataGridViewItems.DataSource = new BindingSource { DataSource = itemsModel };
+
+                    //var customersModel = uow.Customers.GetList();
+                    //dataGridViewCustomers.DataSource = new BindingSource { DataSource = customersModel };
+
+                    //var adjustmentModel = uow.CustomerAdjustment.GetList();
+                    //dataGridViewAdjustment.DataSource = new BindingSource { DataSource = adjustmentModel };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal(ex);
+            }
+        }
+
+        private void btnAddCompany_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                //string connStr = "data source=" + Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) + "\\Database\\BeatrouteTallyIntegration.db";
+
+                ImportController impController = new ImportController();
+                impController.GetCompanyDetails(cmbCompanyName.Text);
+                RefreshGrid();
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal(ex);
+                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void CreateFolder(bool allUsers, string ConfigurationPath)
+        {
+            try
+            {
+                DirectoryInfo directoryInfo;
+                DirectorySecurity directorySecurity;
+                AccessRule rule;
+                //SecurityIdentifier securityIdentifier = new SecurityIdentifier
+                //    (WellKnownSidType.BuiltinUsersSid, null);
+                SecurityIdentifier securityIdentifier = new SecurityIdentifier
+                (WellKnownSidType.WorldSid, null);
+
+                if (!Directory.Exists(ConfigurationPath))
+                {
+                    if (allUsers)
+                    {
+                        bool modified;
+                        directoryInfo = Directory.CreateDirectory(ConfigurationPath);
+                        directorySecurity = directoryInfo.GetAccessControl();
+                        rule = new FileSystemAccessRule(
+                            securityIdentifier,
+                            FileSystemRights.Write |
+                            FileSystemRights.ReadAndExecute |
+                            FileSystemRights.FullControl,
+                            InheritanceFlags.ContainerInherit |
+                            InheritanceFlags.ObjectInherit,
+                            PropagationFlags.None,
+                            AccessControlType.Allow);
+                        directorySecurity.ModifyAccessRule(AccessControlModification.Add, rule, out modified);
+                        directoryInfo.SetAccessControl(directorySecurity);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                //_logger.Fatal(ex);
+            }
+        }
+
+        private void btnSalesInvoices_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                ImportController impController = new ImportController();
+                //impController.UpdateCustomerPayment(cmbCompanyName.Text);
+                impController.UpdateSalesInvoice(cmbCompanyName.Text);
+                impController.UpdateCustomerOutstanding(cmbCompanyName.Text);
+                
+                RefreshGrid();
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal(ex);
+                _logger.Fatal(" ");
+                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnAddItems_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                Session.ProductMaster = Session.Stock = true;
+                using (UnitOfWork uow = new UnitOfWork(UnitOfWork.GetConnectionString(),ConnectionType.SQLite))
+                {
+                    Settings productFilter = uow.Settings.GetList().Where(x => x.Key == "PRODUCT_FILTER").FirstOrDefault();
+                    string[] productNames = null;
+                    ImportController impController = new ImportController();
+                    if (Session.ProductMaster)
+                    {
+                        if (!string.IsNullOrEmpty(productFilter.Value))
+                        {
+                            string pattern = @"[ ,;]+";
+                            productNames = Regex.Split(productFilter.Value, pattern);
+                        }
+                        impController.UpdateItems(cmbCompanyName.Text, productNames);
+                    }
+                    if (Session.Stock)
+                        impController.UpdateStock(cmbCompanyName.Text);
+                }
+                RefreshGrid();
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal(ex);
+                _logger.Fatal(" ");
+                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnAddCustomers_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                ImportController impController = new ImportController();
+                impController.UpdateCustomers(cmbCompanyName.Text);
+                RefreshGrid();
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal(ex);
+                _logger.Fatal(" ");
+                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnStock_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                ImportController impController = new ImportController();
+                impController.UpdateStock(cmbCompanyName.Text);
+                RefreshGrid();
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal(ex);
+                _logger.Fatal(" ");
+                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnGetApiTest_Click(object sender, EventArgs e)
+        {
+            //ApiHelper.GetCustomerPayment();
+            //ApiHelper.GetCustomerOrder();
+        }
+
+        private void btnTalltPostCustomerPayment_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                
+                using (UnitOfWork uow = new UnitOfWork(UnitOfWork.GetConnectionString(), ConnectionType.SQLite))
+                {
+                    CustomerPayment customerPayment = uow.CustomerPayment.GetList().Where(x => x.PaymentId == "1436").FirstOrDefault();
+                    ExportController exportController = new ExportController();
+                    //exportController.PostCustomerPaymentToTally(customerPayment);
+
+                }
+            }
+            catch (Exception ex)
+            {
+
+                //throw;
+            }
+        }
+
+        private void btnPostToTally_Click(object sender, EventArgs e)
+        {
+            using (UnitOfWork uow = new UnitOfWork(UnitOfWork.GetConnectionString(), OrchidDALBase.ConnectionType.SQLite))
+            {
+                ExportController expCon = new ExportController();
+                var customerOrder = uow.CustomerOrder.GetList().Where(x => x.CompanyId == "4adeb2ab-9867-48fa-b7f7-1cf1b590540f" && x.OrderId == "1435111").FirstOrDefault();
+                expCon.PostCustomerOrderToTally(customerOrder);
+            }
+        }
+    }
+}

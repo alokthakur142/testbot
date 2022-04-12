@@ -1,0 +1,119 @@
+﻿using NLog;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationBase.Common
+{
+    public static class StringFunctions
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+
+        public static string Encrypt(string text)
+        {
+            try
+            {
+                byte[] key = ASCIIEncoding.ASCII.GetBytes(Session.Key);
+                byte[] iv = ASCIIEncoding.ASCII.GetBytes(Session.IV);
+                // Encrypt the string to an array of bytes.
+                string encryptedStr = EncryptStringToBytes_Aes(text, key, iv);
+
+                return encryptedStr;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex);
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|");
+                return null;
+            }
+        }
+        public static string Decrypt(string strToDecrypt)
+        {
+            try
+            {
+                byte[] key = ASCIIEncoding.ASCII.GetBytes(Session.Key);
+                byte[] iv = ASCIIEncoding.ASCII.GetBytes(Session.IV);
+                byte[] byteArray = Convert.FromBase64String(strToDecrypt);
+                string decryptedString = DecryptStringFromBytes_Aes(byteArray, key, iv);
+                return decryptedString;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex);
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|");
+                return null;
+            }
+        }
+        static string EncryptStringToBytes_Aes(string plainText, byte[] Key, byte[] IV)
+        {
+            if (plainText == null || plainText.Length <= 0)
+                throw new ArgumentNullException("Text to encrypt is null or empty");
+            if (Key == null || Key.Length <= 0)
+                throw new ArgumentNullException("Key is null or empty");
+            if (IV == null || IV.Length <= 0)
+                throw new ArgumentNullException("IV is null or empty");
+
+            AesCryptoServiceProvider aesAlg = new AesCryptoServiceProvider();
+            aesAlg.Mode = CipherMode.CBC;
+            aesAlg.Key = Key;
+            aesAlg.IV = IV;
+            byte[] byteBuff = ASCIIEncoding.ASCII.GetBytes(plainText);
+
+            return Convert.ToBase64String(aesAlg.CreateEncryptor().TransformFinalBlock(byteBuff,0,byteBuff.Length)); ;
+        }
+        static string DecryptStringFromBytes_Aes(byte[] cipherText, byte[] Key, byte[] IV)
+        {
+            if (cipherText == null || cipherText.Length <= 0)
+                throw new ArgumentNullException("Decryption text is null or empty");
+            if (Key == null || Key.Length <= 0)
+                throw new ArgumentNullException("Key is null or empty");
+            if (IV == null || IV.Length <= 0)
+                throw new ArgumentNullException("IV is null or empty");
+
+            AesCryptoServiceProvider aesAlg = new AesCryptoServiceProvider();
+            aesAlg.Key = Key;
+            aesAlg.IV = IV;
+            aesAlg.Mode = CipherMode.CBC;
+
+            string plaintext = ASCIIEncoding.ASCII.GetString(aesAlg.CreateDecryptor().TransformFinalBlock(cipherText,0,cipherText.Length));
+
+            return plaintext;
+        }
+
+        /// <summary>
+        /// This function is used to encrypt the installation tracking details
+        /// </summary>
+        /// <param name="strToEncrypt"></param>
+        /// <param name="strKey"></param>
+        /// <returns>
+        /// Encrypted string
+        /// </returns>
+        public static string EncryptString(this string strToEncrypt, string strKey)
+        {
+            try
+            {
+                TripleDESCryptoServiceProvider objDESCrypto =
+                    new TripleDESCryptoServiceProvider();
+                MD5CryptoServiceProvider objHashMD5 = new MD5CryptoServiceProvider();
+                byte[] byteHash, byteBuff;
+                string strTempKey = strKey;
+                byteHash = objHashMD5.ComputeHash(ASCIIEncoding.ASCII.GetBytes(strTempKey));
+                objHashMD5 = null;
+                objDESCrypto.Key = byteHash;
+                objDESCrypto.Mode = CipherMode.ECB; //CBC, CFB
+                byteBuff = ASCIIEncoding.ASCII.GetBytes(strToEncrypt);
+                return Convert.ToBase64String(objDESCrypto.CreateEncryptor().
+                    TransformFinalBlock(byteBuff, 0, byteBuff.Length));
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("ImportWorker|" + Session.UserName + "|" + ex );
+                return null;
+            }
+        }
+    }
+}

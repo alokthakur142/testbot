@@ -1,0 +1,82 @@
+﻿using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.Models
+{
+    [ModelAttributes(Key = "Id", TableName = "CustomerOrder")]
+    public class CustomerOrder
+    {
+        public Guid Id { get; set; }
+
+        public string OrderId { get; set; }
+
+        public string CompanyId { get; set; }
+
+        public string OrderNo { get; set; }
+
+        public DateTime OrderDate { get; set; }
+
+        public string CustomerId { get; set; }
+
+        public string CustomerName { get; set; }
+
+        public string TermsOfPayment { get; set; }
+
+        public string DespatchThrough { get; set; }
+
+        public string Destination { get; set; }
+
+        public string BuyerCustomerName { get; set; }
+
+        public string BuyerCustomerAddress1 { get; set; }
+
+        public string BuyerCustomerAddress2 { get; set; }
+
+        public string BuyerCustomerAddress3 { get; set; }
+
+        public string BuyerState { get; set; }
+
+        public string BuyerGstin { get; set; }
+
+        public string ShipToCustomerName { get; set; }
+
+        public string ShipToAddress1 { get; set; }
+
+        public string ShipToAddress2 { get; set; }
+
+        public string ShipToAddress3 { get; set; }
+
+        public string ShipToState { get; set; }
+
+        public string ShipToGstin { get; set; }
+
+        public string Narration { get; set; }
+
+        public string BeatrouteOrderId { get; set; }
+        
+        public string Guid { get; set; }
+
+        public string OtherReference { get; set; }
+
+        public string TermsOfDelivery { get; set; }
+
+        public decimal RetryCount { get; set; }
+
+        public DateTime ImportedOn { get; set; }
+
+        public bool IsPosted { get; set; }
+
+        public DateTime PostedOn { get; set; }
+
+        public string PostingMessage { get; set; }
+        public bool IsConfirmed { get; set; }
+        public string ConfirmedMessage { get; set; }
+        public DateTime ConfirmedOn { get; set; }
+
+        public string TallyCompanyId { get; set; }
+    }
+}

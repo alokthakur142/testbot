@@ -1,0 +1,383 @@
+﻿namespace BeatrouteTallyIntegration
+{
+    partial class MainForm
+    {
+        /// <summary>
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary>
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Windows Form Designer generated code
+
+        /// <summary>
+        /// Required method for Designer support - do not modify
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            this.components = new System.ComponentModel.Container();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
+            this.sidePanel = new System.Windows.Forms.Panel();
+            this.ctrlCustomDivider1 = new BeatrouteTallyIntegration.Controls.ctrlCustomDivider();
+            this.btnHelpAndSupport = new System.Windows.Forms.Button();
+            this.btnDashboard = new System.Windows.Forms.Button();
+            this.btnSyncStatus = new System.Windows.Forms.Button();
+            this.btnSettings = new System.Windows.Forms.Button();
+            this.btnCompanies = new System.Windows.Forms.Button();
+            this.logoPanel = new System.Windows.Forms.Panel();
+            this.ctrlCustomDivider2 = new BeatrouteTallyIntegration.Controls.ctrlCustomDivider();
+            this.label2 = new System.Windows.Forms.Label();
+            this.pictureBox1 = new System.Windows.Forms.PictureBox();
+            this.label1 = new System.Windows.Forms.Label();
+            this.userControlPanel = new System.Windows.Forms.Panel();
+            this.pictureBoxLogin = new System.Windows.Forms.PictureBox();
+            this.panel1 = new System.Windows.Forms.Panel();
+            this.ctrlCustomDivider3 = new BeatrouteTallyIntegration.Controls.ctrlCustomDivider();
+            this.LoginComboBox = new System.Windows.Forms.ComboBox();
+            this.lblUserName = new System.Windows.Forms.Label();
+            this.notifyIcon2 = new System.Windows.Forms.NotifyIcon(this.components);
+            this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.toolStripMenuItemShowApp = new System.Windows.Forms.ToolStripMenuItem();
+            this.quitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.sidePanel.SuspendLayout();
+            this.logoPanel.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxLogin)).BeginInit();
+            this.panel1.SuspendLayout();
+            this.contextMenuStrip1.SuspendLayout();
+            this.SuspendLayout();
+            // 
+            // sidePanel
+            // 
+            this.sidePanel.BackColor = System.Drawing.Color.White;
+            this.sidePanel.Controls.Add(this.ctrlCustomDivider1);
+            this.sidePanel.Controls.Add(this.btnHelpAndSupport);
+            this.sidePanel.Controls.Add(this.btnDashboard);
+            this.sidePanel.Controls.Add(this.btnSyncStatus);
+            this.sidePanel.Controls.Add(this.btnSettings);
+            this.sidePanel.Controls.Add(this.btnCompanies);
+            this.sidePanel.Controls.Add(this.logoPanel);
+            this.sidePanel.Dock = System.Windows.Forms.DockStyle.Left;
+            this.sidePanel.Location = new System.Drawing.Point(0, 0);
+            this.sidePanel.Name = "sidePanel";
+            this.sidePanel.Size = new System.Drawing.Size(200, 596);
+            this.sidePanel.TabIndex = 0;
+            // 
+            // ctrlCustomDivider1
+            // 
+            this.ctrlCustomDivider1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.ctrlCustomDivider1.ForeColor = System.Drawing.Color.DodgerBlue;
+            this.ctrlCustomDivider1.isVertical = true;
+            this.ctrlCustomDivider1.Location = new System.Drawing.Point(190, 79);
+            this.ctrlCustomDivider1.Name = "ctrlCustomDivider1";
+            this.ctrlCustomDivider1.Size = new System.Drawing.Size(10, 514);
+            this.ctrlCustomDivider1.TabIndex = 0;
+            this.ctrlCustomDivider1.Text = "ctrlCustomDivider1";
+            this.ctrlCustomDivider1.Thickness = 2;
+            // 
+            // btnHelpAndSupport
+            // 
+            this.btnHelpAndSupport.BackColor = System.Drawing.Color.Transparent;
+            this.btnHelpAndSupport.FlatAppearance.BorderSize = 0;
+            this.btnHelpAndSupport.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnHelpAndSupport.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.btnHelpAndSupport.ForeColor = System.Drawing.Color.Black;
+            this.btnHelpAndSupport.Location = new System.Drawing.Point(0, 270);
+            this.btnHelpAndSupport.Name = "btnHelpAndSupport";
+            this.btnHelpAndSupport.Size = new System.Drawing.Size(194, 44);
+            this.btnHelpAndSupport.TabIndex = 5;
+            this.btnHelpAndSupport.Text = "Help And Support";
+            this.btnHelpAndSupport.UseVisualStyleBackColor = false;
+            this.btnHelpAndSupport.Click += new System.EventHandler(this.btnHelpAndSupport_Click);
+            // 
+            // btnDashboard
+            // 
+            this.btnDashboard.BackColor = System.Drawing.Color.Transparent;
+            this.btnDashboard.FlatAppearance.BorderSize = 0;
+            this.btnDashboard.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnDashboard.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.btnDashboard.ForeColor = System.Drawing.Color.Black;
+            this.btnDashboard.Location = new System.Drawing.Point(0, 79);
+            this.btnDashboard.Name = "btnDashboard";
+            this.btnDashboard.Size = new System.Drawing.Size(194, 44);
+            this.btnDashboard.TabIndex = 1;
+            this.btnDashboard.Text = "Home";
+            this.btnDashboard.UseVisualStyleBackColor = false;
+            this.btnDashboard.Click += new System.EventHandler(this.btnDashboard_Click);
+            // 
+            // btnSyncStatus
+            // 
+            this.btnSyncStatus.BackColor = System.Drawing.Color.Transparent;
+            this.btnSyncStatus.FlatAppearance.BorderSize = 0;
+            this.btnSyncStatus.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnSyncStatus.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.btnSyncStatus.ForeColor = System.Drawing.Color.Black;
+            this.btnSyncStatus.Location = new System.Drawing.Point(0, 223);
+            this.btnSyncStatus.Name = "btnSyncStatus";
+            this.btnSyncStatus.Size = new System.Drawing.Size(194, 44);
+            this.btnSyncStatus.TabIndex = 4;
+            this.btnSyncStatus.Text = "Sync Status";
+            this.btnSyncStatus.UseVisualStyleBackColor = false;
+            this.btnSyncStatus.Click += new System.EventHandler(this.btnSyncStatus_Click);
+            // 
+            // btnSettings
+            // 
+            this.btnSettings.BackColor = System.Drawing.Color.Transparent;
+            this.btnSettings.FlatAppearance.BorderSize = 0;
+            this.btnSettings.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnSettings.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.btnSettings.ForeColor = System.Drawing.Color.Black;
+            this.btnSettings.Location = new System.Drawing.Point(0, 175);
+            this.btnSettings.Name = "btnSettings";
+            this.btnSettings.Size = new System.Drawing.Size(194, 44);
+            this.btnSettings.TabIndex = 3;
+            this.btnSettings.Text = "Settings";
+            this.btnSettings.UseVisualStyleBackColor = false;
+            this.btnSettings.Click += new System.EventHandler(this.btnSettings_Click);
+            // 
+            // btnCompanies
+            // 
+            this.btnCompanies.BackColor = System.Drawing.Color.Transparent;
+            this.btnCompanies.FlatAppearance.BorderSize = 0;
+            this.btnCompanies.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnCompanies.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.btnCompanies.ForeColor = System.Drawing.Color.Black;
+            this.btnCompanies.Location = new System.Drawing.Point(0, 127);
+            this.btnCompanies.Name = "btnCompanies";
+            this.btnCompanies.Size = new System.Drawing.Size(194, 44);
+            this.btnCompanies.TabIndex = 2;
+            this.btnCompanies.Text = "Companies";
+            this.btnCompanies.UseVisualStyleBackColor = false;
+            this.btnCompanies.Click += new System.EventHandler(this.btnCompanies_Click);
+            // 
+            // logoPanel
+            // 
+            this.logoPanel.BackColor = System.Drawing.Color.White;
+            this.logoPanel.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
+            this.logoPanel.Controls.Add(this.ctrlCustomDivider2);
+            this.logoPanel.Controls.Add(this.label2);
+            this.logoPanel.Controls.Add(this.pictureBox1);
+            this.logoPanel.Controls.Add(this.label1);
+            this.logoPanel.Dock = System.Windows.Forms.DockStyle.Top;
+            this.logoPanel.Location = new System.Drawing.Point(0, 0);
+            this.logoPanel.Name = "logoPanel";
+            this.logoPanel.Size = new System.Drawing.Size(200, 76);
+            this.logoPanel.TabIndex = 0;
+            // 
+            // ctrlCustomDivider2
+            // 
+            this.ctrlCustomDivider2.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.ctrlCustomDivider2.ForeColor = System.Drawing.Color.DodgerBlue;
+            this.ctrlCustomDivider2.isVertical = false;
+            this.ctrlCustomDivider2.Location = new System.Drawing.Point(0, 66);
+            this.ctrlCustomDivider2.Name = "ctrlCustomDivider2";
+            this.ctrlCustomDivider2.Size = new System.Drawing.Size(200, 10);
+            this.ctrlCustomDivider2.TabIndex = 1;
+            this.ctrlCustomDivider2.Text = "ctrlCustomDivider2";
+            this.ctrlCustomDivider2.Thickness = 2;
+            // 
+            // label2
+            // 
+            this.label2.AutoSize = true;
+            this.label2.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label2.ForeColor = System.Drawing.Color.DeepSkyBlue;
+            this.label2.Location = new System.Drawing.Point(67, 40);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(102, 16);
+            this.label2.TabIndex = 4;
+            this.label2.Text = "Tally Connector";
+            // 
+            // pictureBox1
+            // 
+            this.pictureBox1.Image = ((System.Drawing.Image)(resources.GetObject("pictureBox1.Image")));
+            this.pictureBox1.Location = new System.Drawing.Point(26, 16);
+            this.pictureBox1.Name = "pictureBox1";
+            this.pictureBox1.Size = new System.Drawing.Size(32, 32);
+            this.pictureBox1.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
+            this.pictureBox1.TabIndex = 3;
+            this.pictureBox1.TabStop = false;
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 14.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label1.ForeColor = System.Drawing.Color.DeepSkyBlue;
+            this.label1.Location = new System.Drawing.Point(64, 16);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(106, 24);
+            this.label1.TabIndex = 2;
+            this.label1.Text = "BeatRoute";
+            // 
+            // userControlPanel
+            // 
+            this.userControlPanel.BackColor = System.Drawing.Color.Transparent;
+            this.userControlPanel.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.userControlPanel.Location = new System.Drawing.Point(200, 0);
+            this.userControlPanel.Name = "userControlPanel";
+            this.userControlPanel.Size = new System.Drawing.Size(721, 596);
+            this.userControlPanel.TabIndex = 2;
+            // 
+            // pictureBoxLogin
+            // 
+            this.pictureBoxLogin.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.pictureBoxLogin.Image = ((System.Drawing.Image)(resources.GetObject("pictureBoxLogin.Image")));
+            this.pictureBoxLogin.Location = new System.Drawing.Point(676, 7);
+            this.pictureBoxLogin.Margin = new System.Windows.Forms.Padding(2);
+            this.pictureBoxLogin.Name = "pictureBoxLogin";
+            this.pictureBoxLogin.Size = new System.Drawing.Size(34, 36);
+            this.pictureBoxLogin.SizeMode = System.Windows.Forms.PictureBoxSizeMode.CenterImage;
+            this.pictureBoxLogin.TabIndex = 0;
+            this.pictureBoxLogin.TabStop = false;
+            this.pictureBoxLogin.Click += new System.EventHandler(this.roundButton1_Click);
+            // 
+            // panel1
+            // 
+            this.panel1.BackColor = System.Drawing.Color.White;
+            this.panel1.Controls.Add(this.ctrlCustomDivider3);
+            this.panel1.Controls.Add(this.pictureBoxLogin);
+            this.panel1.Controls.Add(this.LoginComboBox);
+            this.panel1.Controls.Add(this.lblUserName);
+            this.panel1.Dock = System.Windows.Forms.DockStyle.Top;
+            this.panel1.Location = new System.Drawing.Point(200, 0);
+            this.panel1.Name = "panel1";
+            this.panel1.Size = new System.Drawing.Size(721, 76);
+            this.panel1.TabIndex = 3;
+            // 
+            // ctrlCustomDivider3
+            // 
+            this.ctrlCustomDivider3.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.ctrlCustomDivider3.ForeColor = System.Drawing.Color.DodgerBlue;
+            this.ctrlCustomDivider3.isVertical = false;
+            this.ctrlCustomDivider3.Location = new System.Drawing.Point(-18, 66);
+            this.ctrlCustomDivider3.Name = "ctrlCustomDivider3";
+            this.ctrlCustomDivider3.Size = new System.Drawing.Size(739, 10);
+            this.ctrlCustomDivider3.TabIndex = 3;
+            this.ctrlCustomDivider3.Text = "ctrlCustomDivider3";
+            this.ctrlCustomDivider3.Thickness = 2;
+            // 
+            // LoginComboBox
+            // 
+            this.LoginComboBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.LoginComboBox.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.LoginComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.Simple;
+            this.LoginComboBox.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.LoginComboBox.Items.AddRange(new object[] {
+            "Login",
+            "Logout"});
+            this.LoginComboBox.Location = new System.Drawing.Point(653, 44);
+            this.LoginComboBox.Margin = new System.Windows.Forms.Padding(2);
+            this.LoginComboBox.Name = "LoginComboBox";
+            this.LoginComboBox.Size = new System.Drawing.Size(57, 21);
+            this.LoginComboBox.TabIndex = 2;
+            this.LoginComboBox.Text = "Login";
+            this.LoginComboBox.Visible = false;
+            this.LoginComboBox.Click += new System.EventHandler(this.LoginComboBox_Click);
+            // 
+            // lblUserName
+            // 
+            this.lblUserName.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.lblUserName.AutoSize = true;
+            this.lblUserName.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblUserName.Location = new System.Drawing.Point(518, 16);
+            this.lblUserName.Name = "lblUserName";
+            this.lblUserName.Size = new System.Drawing.Size(153, 20);
+            this.lblUserName.TabIndex = 1;
+            this.lblUserName.Text = "User is not logged in";
+            // 
+            // notifyIcon2
+            // 
+            this.notifyIcon2.Text = "notifyIcon2";
+            this.notifyIcon2.Visible = true;
+            // 
+            // contextMenuStrip1
+            // 
+            this.contextMenuStrip1.ImageScalingSize = new System.Drawing.Size(20, 20);
+            this.contextMenuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.toolStripMenuItemShowApp,
+            this.quitToolStripMenuItem});
+            this.contextMenuStrip1.Name = "contextMenuStrip1";
+            this.contextMenuStrip1.Size = new System.Drawing.Size(129, 48);
+            // 
+            // toolStripMenuItemShowApp
+            // 
+            this.toolStripMenuItemShowApp.Name = "toolStripMenuItemShowApp";
+            this.toolStripMenuItemShowApp.Size = new System.Drawing.Size(128, 22);
+            this.toolStripMenuItemShowApp.Text = "Show App";
+            this.toolStripMenuItemShowApp.Click += new System.EventHandler(this.toolStripMenuItemShowApp_Click);
+            // 
+            // quitToolStripMenuItem
+            // 
+            this.quitToolStripMenuItem.Name = "quitToolStripMenuItem";
+            this.quitToolStripMenuItem.Size = new System.Drawing.Size(128, 22);
+            this.quitToolStripMenuItem.Text = "Quit";
+            this.quitToolStripMenuItem.Click += new System.EventHandler(this.quitToolStripMenuItem_Click);
+            // 
+            // MainForm
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.ClientSize = new System.Drawing.Size(921, 596);
+            this.Controls.Add(this.panel1);
+            this.Controls.Add(this.userControlPanel);
+            this.Controls.Add(this.sidePanel);
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
+            this.Margin = new System.Windows.Forms.Padding(2);
+            this.Name = "MainForm";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.Text = "BeatRoute";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
+            this.Load += new System.EventHandler(this.MainForm_Load);
+            this.sidePanel.ResumeLayout(false);
+            this.logoPanel.ResumeLayout(false);
+            this.logoPanel.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxLogin)).EndInit();
+            this.panel1.ResumeLayout(false);
+            this.panel1.PerformLayout();
+            this.contextMenuStrip1.ResumeLayout(false);
+            this.ResumeLayout(false);
+
+        }
+
+        #endregion
+
+        private System.Windows.Forms.Panel sidePanel;
+        private System.Windows.Forms.Button btnHelpAndSupport;
+        private System.Windows.Forms.Button btnSyncStatus;
+        private System.Windows.Forms.Button btnSettings;
+        private System.Windows.Forms.Button btnCompanies;
+        private System.Windows.Forms.Panel logoPanel;
+        private System.Windows.Forms.Button btnDashboard;
+        private System.Windows.Forms.Panel userControlPanel;
+        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.PictureBox pictureBox1;
+        private System.Windows.Forms.Label label2;
+        private System.Windows.Forms.Panel panel1;
+        private System.Windows.Forms.Label lblUserName;
+        private System.Windows.Forms.ComboBox LoginComboBox;
+        private System.Windows.Forms.PictureBox pictureBoxLogin;
+        private System.Windows.Forms.NotifyIcon notifyIcon2;
+        private System.Windows.Forms.ContextMenuStrip contextMenuStrip1;
+        private System.Windows.Forms.ToolStripMenuItem toolStripMenuItemShowApp;
+        private System.Windows.Forms.ToolStripMenuItem quitToolStripMenuItem;
+        private Controls.ctrlCustomDivider ctrlCustomDivider1;
+        private Controls.ctrlCustomDivider ctrlCustomDivider2;
+        private Controls.ctrlCustomDivider ctrlCustomDivider3;
+    }
+}

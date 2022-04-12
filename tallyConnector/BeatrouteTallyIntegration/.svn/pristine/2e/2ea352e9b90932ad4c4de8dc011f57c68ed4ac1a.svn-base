@@ -1,0 +1,113 @@
+﻿using BeatrouteTallyIntegrationBase.Common;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace BeatRouteTallyConnectorUpdate
+{
+    static class Program
+    {
+        /// <summary>
+        /// The main entry point for the application.
+        /// </summary>
+        /// 
+
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+
+        [STAThread]
+        static void Main(string[] args)
+        {
+            Console.WriteLine("Initiating Beatroute Tally Connector auto update...");
+
+            try
+            {
+                string downloadUrl = string.Empty;
+                if (args.Length > 0)
+                    downloadUrl = args[0];
+                //ToDo implement NLog
+                if (downloadUrl == string.Empty)
+                    return;
+
+                Console.WriteLine("Starting download...");
+
+                Thread.Sleep(5000);
+                WebClient webClient = new WebClient();
+
+                _logger.Info("ImportWorker | " + Session.UserName + " | " + " ^ ");
+                _logger.Info("ImportWorker|" + Session.UserName + "|Stopping Beatroute Tally Connector..." + "^");
+                Console.WriteLine("Stopping Beatroute Tally Connector...");
+                _logger.Info("ImportWorker | " + Session.UserName + " | " + " ^ ");
+
+                var runningProcess = Process.GetProcessesByName("BeatrouteTallyIntegration");
+                foreach (var item in runningProcess)
+                {
+                    item.Kill();
+                    item.WaitForExit();
+                    item.Dispose();
+                }
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|Stopped..." + "^");
+                Console.WriteLine("Stopped...");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+
+                string[] fileNames = { "\\BeatrouteTallyIntegration.exe", "\\BeatrouteTallyIntegrationBase.dll", "\\BeatrouteTallyIntegrationDAL.dll" };
+
+                _logger.Info("ImportWorker|" + Session.UserName + "|Deleting old files..." + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                Console.WriteLine("Deleting old files...");
+
+                foreach (string fileName in fileNames)
+                {
+                    File.Delete(Application.StartupPath + fileName);
+                    
+                }                
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|Delete completed. Getting Connection from BeatRoute Server..." + "^");
+                Console.WriteLine("Delete completed. Getting Connection from BeatRoute Server...");
+
+                _logger.Info("ImportWorker|" + Session.UserName + "|Downloading file..." + "^");
+                Console.WriteLine("Downloading file...");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                webClient.DownloadFile(new Uri(downloadUrl), @"BeatrouteTallyIntegration.zip");
+                _logger.Info("ImportWorker|" + Session.UserName + "|File downloaded. Initiating extraction.." + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                Console.WriteLine("File downloaded. Initiating extraction..");
+
+                string zipPath = Application.StartupPath + "\\BeatrouteTallyIntegration.zip";
+                string extractPath = Application.StartupPath;
+                ZipFile.ExtractToDirectory(zipPath, extractPath);
+                _logger.Info("ImportWorker|" + Session.UserName + "|Extraction completed. Initiating deleting the zip file.." + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                Console.WriteLine("Extraction completed. Initiating deleting the zip file..");
+
+                File.Delete("BeatrouteTallyIntegration.zip");
+                _logger.Info("ImportWorker|" + Session.UserName + "|Initiating app.." + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                Console.WriteLine("Initiating app..");
+
+                Process.Start(Application.StartupPath + "\\BeatrouteTallyIntegration.exe");
+                _logger.Info("ImportWorker|" + Session.UserName + "|Application updated to latest version" + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                Console.WriteLine("Application updated to latest version");
+                Console.ReadLine();                
+
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal(ex);
+                _logger.Fatal("");                
+                Process.Start(Application.StartupPath + "\\BeatrouteTallyIntegration.exe");                
+            }
+        }
+    }
+}

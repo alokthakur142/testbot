@@ -1,0 +1,86 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using BeatrouteTallyIntegration.Controls;
+
+namespace BeatrouteTallyIntegration
+{
+    public partial class DatabaseDataViewer : Form
+    {
+        bool ApiCall = false;
+        bool Logs = false;
+        public DatabaseDataViewer()
+        {
+            InitializeComponent();
+        }
+
+        private void DatabaseDataViewer_Load(object sender, EventArgs e)
+        {
+            userControlPanel.Padding = new Padding(10);
+            ClearControl();
+            LoadApiCall();
+        }        
+        private void ClearControl()
+        {
+            if (userControlPanel.Controls.Count > 0)
+            {
+                Control currentControl = userControlPanel.Controls[0];
+                currentControl.Dispose();
+            }
+            userControlPanel.Controls.Clear();
+        }
+
+        private void btnApiCall_Click(object sender, EventArgs e)
+        {
+            LoadApiCall();
+        }
+        private void LoadApiCall()
+        {
+            this.SuspendLayout();
+            this.Cursor = Cursors.WaitCursor;
+            ClearControl();
+            ctrlApiCall control = new ctrlApiCall();            
+            control.Dock = DockStyle.Fill;
+            userControlPanel.Controls.Add(control);
+            this.ResumeLayout();
+            ApiCall = true;
+            UpdateButtonColor(ApiCall,false);
+            this.Cursor = Cursors.Default;
+        }
+
+        private void UpdateButtonColor(bool apiCall, bool logs)
+        {
+            if (apiCall)
+            {
+                btnApiCall.BackColor = Color.LightGray;
+                btnLogs.BackColor = Color.White;
+            }
+            else if(logs)
+            {
+                btnLogs.BackColor = Color.LightGray;
+                btnApiCall.BackColor = Color.White;
+            }
+            
+        }
+
+        private void btnLogs_Click(object sender, EventArgs e)
+        {
+            this.SuspendLayout();
+            this.Cursor = Cursors.WaitCursor;
+            ClearControl();
+            ctrlLogs control = new ctrlLogs();
+            control.Dock = DockStyle.Fill;
+            userControlPanel.Controls.Add(control);
+            this.ResumeLayout();
+            Logs = true;
+            UpdateButtonColor(false, Logs);
+            this.Cursor = Cursors.Default;
+        }
+    }
+}

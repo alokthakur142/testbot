@@ -1,0 +1,147 @@
+﻿using NLog;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Updater
+{
+    static class Program
+    {
+        /// <summary>
+        /// The main entry point for the application.
+        /// </summary>
+        /// 
+
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+
+
+        [STAThread]
+        static void Main(string[] args)
+        {
+            try
+            {
+                string downloadUrl = string.Empty;
+                string userName = string.Empty;
+                if (args.Length > 0)
+                {
+                    downloadUrl = args[0];
+                    userName = args[1];
+                }
+                Console.WriteLine("Initiating Beatroute Tally Connector auto update...");
+                _logger.Info("Updater|" + userName + "|Initiating Beatroute Tally Connector auto update..." + "^");
+                _logger.Info("Updater|" + userName + "|" + "^");
+
+                Console.WriteLine("User:" + userName);
+
+
+                if (downloadUrl == string.Empty)
+                {
+                    Console.WriteLine("Download Url not provided");
+                    Console.WriteLine("Press Enter to continue...");
+                    Console.ReadLine();
+                    return;
+                }
+                //Starting Processing 
+                Thread.Sleep(5000);
+                WebClient webClient = new WebClient();
+
+                _logger.Info("Updater|" + userName + "|" + "^");
+                _logger.Info("Updater|" + userName + "|Stopping Beatroute Tally Connector..." + "^");
+                Console.WriteLine("Stopping Beatroute Tally Connector...");
+                _logger.Info("Updater|" + userName + "|" + "^");
+
+                var runningProcess = Process.GetProcessesByName("BeatrouteTallyIntegration");
+                foreach (var item in runningProcess)
+                {
+                    item.Kill();
+                    item.WaitForExit();
+                    item.Dispose();
+                }
+                _logger.Info("Updater|" + userName + "|" + "^");
+                _logger.Info("Updater|" + userName + "|Stopped..." + "^");
+                Console.WriteLine("Stopped...");
+                _logger.Info("Updater|" + userName + "|" + "^");
+
+                _logger.Info("Updater|" + userName + "|Downloading file..." + "^");
+                Console.WriteLine("Downloading file...");
+                _logger.Info("Updater|" + userName + "|" + "^");
+
+                webClient.DownloadFile(new Uri(downloadUrl), @"BeatrouteTallyConnector.zip");
+                Console.WriteLine("File downloaded. Now Initializing Deletion...");
+                _logger.Info("Updater|" + userName + "|File downloaded. Now Initializing Deletion..." + "^");
+                _logger.Info("Updater|" + userName + "|" + "^");
+
+                string[] fileNames =
+                {
+                    "\\BeatrouteTallyIntegration.exe",
+                    "\\BeatrouteTallyIntegrationBase.dll",
+                    "\\BeatrouteTallyIntegrationDAL.dll"
+                };
+
+                _logger.Info("Updater|" + userName + "|Deleting old files..." + "^");
+                _logger.Info("Updater|" + userName + "|" + "^");
+                Console.WriteLine("Deleting old files...");
+
+                foreach (string fileName in fileNames)
+                {
+                    _logger.Info("Updater|" + userName + "|" + fileName + "^");
+                    File.Delete(Application.StartupPath + fileName);
+
+                }
+
+                _logger.Info("Updater|" + userName + "|" + "^");
+                _logger.Info("Updater|" + userName + "|Delete completed..." + "^");
+                Console.WriteLine("Delete completed...");
+
+                _logger.Info("Updater|" + userName + "|Now Initializing Extraction..." + "^");
+                _logger.Info("Updater|" + userName + "|" + "^");
+                Console.WriteLine("Now Initializing Extraction...");
+
+                string zipPath = Application.StartupPath + "\\BeatrouteTallyConnector.zip";
+                string extractPath = Application.StartupPath;
+                ZipFile.ExtractToDirectory(zipPath, extractPath);
+
+                _logger.Info("Updater|" + userName + "|Extraction completed. Now, Initiating deleting the zip file.." + "^");
+                _logger.Info("Updater|" + userName + "|" + "^");
+                Console.WriteLine("Extraction completed at - "+extractPath+". Now, Initiating deleting the zip file..");
+
+                File.Delete("BeatrouteTallyConnector.zip");
+                _logger.Info("Updater|" + userName + "|Zip File Deletion Completed.." + "^");
+                _logger.Info("Updater|" + userName + "|" + "^");
+                Console.WriteLine("Zip File Deletion Completed..");
+
+                _logger.Info("Updater|" + userName + "|Initiating app settings.." + "^");
+                _logger.Info("Updater|" + userName + "|" + "^");
+                Console.WriteLine("Initiating app settings..");
+                
+                _logger.Info("Updater|" + userName + "|Application updated to latest version. Check in Settings for viewing the latest version number..." + "^");
+                _logger.Info("Updater|" + userName + "|" + "^");
+                Console.WriteLine("Application updated to latest version. Check in Settings for viewing the latest version number...");
+
+                Console.WriteLine("Please wait for 5 second application is opening...");
+                Thread.Sleep(5000);
+
+                Process.Start(Application.StartupPath + "\\BeatrouteTallyIntegration.exe");
+
+
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal(ex);
+                _logger.Fatal("");
+                Process.Start(Application.StartupPath + "\\BeatrouteTallyIntegration.exe");
+                Console.WriteLine(ex.Message);
+                Console.WriteLine("Press Enter to continue...");
+                Console.ReadLine();
+
+            }
+        }
+    }
+}

@@ -1,0 +1,114 @@
+﻿using BeatrouteTallyIntegrationBase.API;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationBase.Export;
+using BeatrouteTallyIntegrationBase.Import;
+using BeatrouteTallyIntegrationBase.Utils;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using static BeatrouteTallyIntegrationBase.Utils.Enum;
+
+namespace BeatrouteTallyIntegrationBase.Helpers
+{
+    public class SyncTallyData
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+        public const string GET_TOKEN_URL = "https://apibroker.beatroute.io/v1/login";
+        public static void SyncData(IEnumerable<Company> activeCompanyList)
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    Settings productFilter = uow.Settings.GetList().Where(x => x.Key == "PRODUCT_FILTER").FirstOrDefault();
+                    string[] productNames = null;
+                    ImportController impController = new ImportController();
+                    foreach (Company company in activeCompanyList)
+                    {
+                        if (company.CustomerMaster)
+                            impController.UpdateCustomers(company.CompanyName);
+                        if (company.CustomerOutstanding && DateTime.Now.Subtract(company.LastSyncCustomerOutStanding).TotalHours >= 24)
+                        {
+                            impController.UpdateCustomerOutstanding(company.CompanyName);
+                            company.LastSyncCustomerOutStanding = DateTime.Now;
+                            _logger.Debug("ImportWorker|" + Session.UserName + "|Customer Outstanding last synced on - " + company.LastSyncCustomerOutStanding + "^");
+                            _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                        }
+                        if (company.ProductMaster)
+                        {
+                            if (!string.IsNullOrEmpty(productFilter.Value))
+                            {
+                                string pattern = @"[ ,;]+";
+                                productNames = Regex.Split(productFilter.Value, pattern);
+                            }
+                            impController.UpdateItems(company.CompanyName, productNames);
+                        }
+
+                        if (company.Stock && DateTime.Now.Subtract(company.LastSyncStock).TotalHours >= 24)
+                        {
+                            impController.UpdateStock(company.CompanyName);
+                            company.LastSyncStock = DateTime.Now;
+                            _logger.Debug("ImportWorker|" + Session.UserName + "|Stock last synced on - " + company.LastSyncStock + "^");
+                            _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                        }
+                        if (company.CustomerInvoice)
+                            impController.UpdateSalesInvoice(company.CompanyName);
+
+                        if (company.OrderStatus)
+                            impController.UpdateSalesOrderStatus(company.CompanyName);
+
+                        if (company.SalesOrderDeletionChceking)
+                            impController.UpdateDeletedSalesOrders(company.CompanyName);
+
+                        uow.Company.Update(company);
+
+                    }
+
+                    Login user = uow.Login.GetList().FirstOrDefault();
+
+                    if (user != null && !string.IsNullOrEmpty(user.Token))
+                    {
+                        Session.Token = user.Token;
+                        Session.UserName = user.UserName;
+
+                        foreach (var company in uow.Company.GetList().Where(x => x.IsActive))
+                        {
+                            _logger.Info("ImportWorker|" + Session.UserName + "|Get Customer Order started..." + "^");
+                            _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                            ApiHelper.GetCustomerOrder();
+                            _logger.Info("ImportWorker|" + Session.UserName + "|Get Customer Order completed" + "^");
+                            _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                            _logger.Info("ImportWorker|" + Session.UserName + "|Get Customer Payment started..." + "^");
+                            _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                            ApiHelper.GetCustomerPayment();
+                            _logger.Info("ImportWorker|" + Session.UserName + "|Get Customer Payment completed" + "^");
+                            _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");                         
+                        }
+
+                    }
+                    else if (user == null)
+                    {
+                        _logger.Error("ImportWorker|" + Session.UserName + "|No user found in database. Get API calls from Sync Tally Data failed!" + "^");
+                        _logger.Error("ImportWorker|" + Session.UserName + "|" + "^");
+                    }
+                    else if (string.IsNullOrEmpty(user.Token))
+                    {
+                        _logger.Error("ImportWorker|" + Session.UserName + "|Token is empty for user - " + user.UserName + ". Get API calls from Sync Tally Data failed!" + "^");
+                        _logger.Error("ImportWorker|" + Session.UserName + "|" + "^");
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+    }
+}

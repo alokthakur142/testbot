@@ -1,0 +1,337 @@
+﻿using BeatrouteTallyIntegrationBase.API;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationBase.Export;
+using BeatrouteTallyIntegrationBase.Import;
+using BeatrouteTallyIntegrationBase.Utils;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using static BeatrouteTallyIntegrationBase.Utils.Enum;
+
+namespace BeatrouteTallyIntegrationBase.Helpers
+{
+    public class PostTallyData
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+        public const string GET_TOKEN_URL = "https://broker.beatroute.io/v1/login";
+        private static int API_PAGE_SIZE = 100;
+        public static void PostData(IEnumerable<Company> activeCompanyList)
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    Login user = uow.Login.GetList().FirstOrDefault();
+
+                    if (user != null && !string.IsNullOrEmpty(user.Token))
+                    {
+                        Session.Token = user.Token;
+                        Session.UserName = user.UserName;
+
+                        int noOfPages = 0;                        
+
+                        foreach (Company company in activeCompanyList)
+                        {
+
+                            #region Customer
+
+                            if (company.CustomerMaster)
+                            {
+                                List<Customers> customerList = uow.Customers.GetList().Where(x => x.CompanyId == company.Guid && x.RetryCount < 5 && !x.IsPosted).ToList();
+                                noOfPages = customerList.Count() / API_PAGE_SIZE;
+
+                                //If The number of Customer Master from Tally is Odd Number then we are converting it to a Whole number. 
+                                if (customerList.Count % API_PAGE_SIZE != 0)
+                                    noOfPages = noOfPages + 1;
+
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Post Customer Master started..." + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                                for (int i = 0; i < noOfPages; i++)
+                                {
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|Page: " + (i + 1).ToString() + "^");
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                    ApiHelper.PostCustomer(customerList.Skip(i * API_PAGE_SIZE).Take(API_PAGE_SIZE).ToList());
+                                }
+
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Post Customer Master completed" + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                            }
+
+                            #endregion
+
+                            #region Customer OutStanding
+
+                            if (company.CustomerOutstanding)
+                            {
+                                List<CustomerOutstanding> customerOutstandingList = uow.CustomerOutstanding.GetList().Where(x => x.CompanyId == company.Guid && x.RetryCount < 5 && !x.IsPosted).ToList();
+                                noOfPages = customerOutstandingList.Count() / API_PAGE_SIZE;
+
+                                //If The number of Customer Outstanding from Tally is Odd Number then we are converting it to a Whole number. 
+                                if (customerOutstandingList.Count % API_PAGE_SIZE != 0)
+                                    noOfPages = noOfPages + 1;
+                                
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Post Customer Outstanding started..." + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                for (int i = 0; i < noOfPages; i++)
+                                {
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|Page: " + (i + 1).ToString() + "^");
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                    ApiHelper.PostCustomerOutstanding(customerOutstandingList.Skip(i * API_PAGE_SIZE).Take(API_PAGE_SIZE).ToList());
+                                }
+
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Post Customer Outstanding completed" + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                            }
+
+                            #endregion
+
+                            #region Items
+
+                            if (company.ProductMaster)
+                            {
+                                List<Items> itemList = uow.Items.GetList().Where(x => x.CompanyId == company.Guid && x.RetryCount < 5 && !x.IsPosted).ToList();                                
+                                noOfPages = itemList.Count()/API_PAGE_SIZE;
+
+                                //If The number of Items from Tally is Odd Number then we are converting it to a Whole number. 
+                                if (itemList.Count % API_PAGE_SIZE != 0)
+                                    noOfPages = noOfPages + 1;
+                                
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Post Items started..." + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                for (int i = 0; i < noOfPages; i++)
+                                {
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|Page: " + (i+1).ToString() + "^");
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                    ApiHelper.PostItems(itemList.Skip(i * API_PAGE_SIZE).Take(API_PAGE_SIZE).ToList());
+                                }
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Post Items completed" + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                            }
+
+                            #endregion
+
+                            #region Stock
+
+                            if (company.Stock)
+                            {
+                                List<Stock> stockList = uow.Stock.GetList().Where(x => x.CompanyId == company.Guid && x.RetryCount < 5 && !x.IsPosted).ToList();
+                                noOfPages = stockList.Count() / API_PAGE_SIZE;
+
+                                //If The number of Stock from Tally is Odd Number then we are converting it to a Whole number. 
+                                if (stockList.Count % API_PAGE_SIZE != 0)
+                                    noOfPages = noOfPages + 1;
+
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Post Stock started..." + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                                for (int i = 0; i < noOfPages; i++)
+                                {
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|Page: " + (i + 1).ToString() + "^");
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                    ApiHelper.PostStock(stockList.Skip(i * API_PAGE_SIZE).Take(API_PAGE_SIZE).ToList());
+                                }
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Post Stock completed" + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                            }
+
+                            #endregion
+
+                            #region Customer Payment
+                            if (company.CustomerPayment)
+                            {
+                                List<CustomerPayment> customerPaymentPostingList = uow.CustomerPayment.GetList().Where(x => x.CompanyId == company.Guid && x.RetryCount < 5 && !x.IsPosted && x.TallyCompanyId == company.Guid).ToList();
+                                //List<CustomerPayment> customerPaymentPostingList = uow.CustomerPayment.GetList().Where(x => x.PaymentId == "60e9565e65007978d2c85b46").ToList();
+
+                                ExportController exportController = new ExportController();
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Initiating Customer Payment (Receipt) entries posting to Tally" + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                foreach (CustomerPayment customerPayment in customerPaymentPostingList)
+                                {
+                                    exportController.PostCustomerPaymentToTally(customerPayment);
+                                }
+                                var customerPaymentCount = uow.CustomerPayment.GetList().Where(x => x.IsPosted).Count();
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Customer Payment posting to Tally completed" + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + customerPaymentCount +" Customer Payments posted to Tally" + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+
+                                #region Customer Posted Payment Status old code commented out
+                                /*
+                                //ImportController impController = new ImportController();
+                                //_logger.Info("Checking tally for confirmed receipt entries for company - " + company.CompanyName);
+                                //_logger.Info("ImportWorker|" + Session.UserName + "|");
+                                //impController.UpdateReceipt(customerPaymentPostingList);
+                                //_logger.Info("Tally checking completed. Initiating the status posting..");
+                                //_logger.Info("ImportWorker|" + Session.UserName + "|");
+
+                                bool posted = false;
+                                List<CustomerPaymentPostingConfirmation> unpostedCustomerPostedPaymentList = uow.CustomerPaymentPostingConfirmation.GetList().Where(x => x.CompanyId == company.Guid && x.RetryCount > 0 && !x.IsSuccess && !x.IsPosted).ToList();
+                                if (unpostedCustomerPostedPaymentList.Count > 0)
+                                {
+                                    _logger.Info("Initiating the status posting for receipt entries which are not posted to Tally for company - " + company.CompanyName);
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|");
+                                    posted = ApiHelper.PostCustomerPostedPayment(unpostedCustomerPostedPaymentList);
+                                    _logger.Info("Status posting for receipt entries which are not posted to Tally for company - " + company.CompanyName + " completed");
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|");
+                                }
+
+                                List<CustomerPaymentPostingConfirmation> postedCustomerPostedPaymentList = uow.CustomerPaymentPostingConfirmation.GetList().Where(x => x.CompanyId == company.Guid && x.RetryCount > 0 && x.IsSuccess && !x.IsPosted).ToList();
+                                if (postedCustomerPostedPaymentList.Count > 0)
+                                {
+                                    _logger.Info("Initiating the status posting for receipt entries which are posted and made regular Receipt voucher in Tally for company - " + company.CompanyName);
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|");
+                                    posted = ApiHelper.PostCustomerPostedPayment(postedCustomerPostedPaymentList);
+                                    _logger.Info("Status posting for receipt entries which are posted and made regular Receipt voucher in Tally for company - " + company.CompanyName + " completed");
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|");
+                                }
+
+                                if (posted)
+                                    _logger.Info("CustomerPostedPayment status posted successfully");
+                                else if (postedCustomerPostedPaymentList.Count == 0 && unpostedCustomerPostedPaymentList.Count == 0 && !posted)
+                                    _logger.Info("No entries confirmed for Customer Payment");
+                                else
+                                    _logger.Info("Customer Payment status posting failed.");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|");
+                                */
+                                #endregion
+
+                                //Subhabrata 17-Sep-2021 : Changes for posting status (Status api will be fired for those payment entries which are successfully posted to tally
+                                #region Customer Posted Payment Status
+
+                                List<CustomerPayment> postedCustomerPaymentList = uow.CustomerPayment.GetList().Where(x => x.IsPosted && x.TallyCompanyId == company.Guid).ToList();
+                                if (postedCustomerPaymentList.Count > 0)
+                                {
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|Initiating Customer Payments posted status for posted entries" + "^");
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                    ApiHelper.PostCustomerPostedPayment(postedCustomerPaymentList);
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|Customer Payments status posting completed" + "^");
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                }
+
+                                #endregion
+
+                                //EndChanges
+
+                            }
+                            #endregion
+
+                            #region Customer Order
+
+                            if (company.CustomerOrder)
+                            {
+                                bool posted = false;
+                                List<CustomerOrder> customerOrderList = uow.CustomerOrder.GetList().Where(x => x.CompanyId == company.Guid && x.RetryCount < 5 && !x.IsPosted && x.TallyCompanyId == company.Guid).ToList();
+                                ExportController exportController = new ExportController();
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Initiating Customer Order entries posting to Tally" + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                foreach (CustomerOrder customerOrders in customerOrderList)
+                                {
+                                    exportController.PostCustomerOrderToTally(customerOrders);
+                                }
+                                var customerOrderCount = uow.CustomerOrder.GetList().Where(x => x.IsPosted).Count();
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + customerOrderCount +" Customer Orders posted to Tally" + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Posting Customer Order Status started..." + "^");
+                                List<CustomerOrder> postedCustomerOrderList = uow.CustomerOrder.GetList().Where(x => x.CompanyId == company.Guid && !x.IsConfirmed && x.IsPosted && x.TallyCompanyId == company.Guid).ToList();
+                                if (postedCustomerOrderList.Count > 0)
+                                {
+                                    posted = ApiHelper.PostCustomerOrder(postedCustomerOrderList);
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|Posted Customer Orders count - " + postedCustomerOrderList.Count + "^");
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                }
+
+                                if (posted)
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|Customer Order status posted successfully" + "^");
+                                //else if (postedCustomerOrderList.Count == 0 && unpostedCustomerOrderList.Count == 0 && !posted)
+                                //    _logger.Info("No entries confirmed for Customer Order");
+                                else
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|Customer Order status posting failed. Please check logs for detail" + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                            }
+
+                            #endregion
+
+                            #region Sales Invoice
+
+                            if (company.CustomerInvoice)
+                            {
+                                List<SalesInvoice> salesInvoiceList = uow.SalesInvoice.GetList().Where(x => x.CompanyId == company.Guid && x.RetryCount < 5 && !x.IsPosted).ToList();
+                                noOfPages = salesInvoiceList.Count() / API_PAGE_SIZE;
+
+                                //If The number of Sales Invoice from Tally is Odd Number then we are converting it to a Whole number. 
+                                if (salesInvoiceList.Count % API_PAGE_SIZE != 0)
+                                    noOfPages = noOfPages + 1;
+
+
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Post Sales Invoice started..." + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                                for (int i = 0; i < noOfPages; i++)
+                                {
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|Page: " + (i + 1).ToString() + "^");
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                    ApiHelper.PostSalesInvoice(salesInvoiceList.Skip(i * API_PAGE_SIZE).Take(API_PAGE_SIZE).ToList());
+                                }
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Post Sales Invoice completed" + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                            }
+
+                            #endregion
+
+                            #region Order Status
+                            if (company.OrderStatus)
+                            {
+                                List<OrderStatus> orderStatusList = uow.OrderStatus.GetList().Where(x => x.CompanyId == company.Guid && x.RetryCount < 5 && !x.IsPosted).ToList();
+                                noOfPages = orderStatusList.Count() / API_PAGE_SIZE;
+
+                                //If The number of Sales Order Status from Database is Odd Number then we are converting it to a Whole number. 
+                                if (orderStatusList.Count % API_PAGE_SIZE != 0)
+                                    noOfPages = noOfPages + 1;
+
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Post Sales Invoice started..." + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                                for (int i = 0; i < noOfPages; i++)
+                                {
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|Page: " + (i + 1).ToString() + "^");
+                                    _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                    ApiHelper.PostOrderStatus(orderStatusList.Skip(i * API_PAGE_SIZE).Take(API_PAGE_SIZE).ToList());
+                                }
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Post Sales Invoice completed" + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                            }
+                            #endregion
+
+                            _logger.Info("ImportWorker|" + Session.UserName + "|Post tally data completed for company: " + company.CompanyName + "^");
+                            _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                        }
+
+                    }
+                    else if(user == null)
+                    {
+                        _logger.Error("ImportWorker|" + Session.UserName + "|No user found in database. Post Data failed!" + "^");
+                        _logger.Error("ImportWorker|" + Session.UserName + "|" + "^");
+                    }
+                    else if(string.IsNullOrEmpty(user.Token))
+                    {
+                        _logger.Error("ImportWorker|" + Session.UserName + "|Token is empty for user - " + user.UserName + ". Post Data failed!" + "^");
+                        _logger.Error("ImportWorker|" + Session.UserName + "|" + "^");
+                    }
+
+                }
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+    }
+}

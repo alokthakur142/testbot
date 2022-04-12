@@ -1,0 +1,54 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Net;
+using System.IO;
+using System.Diagnostics;
+using System.IO.Compression;
+using BeatrouteTallyIntegration.Utils;
+using NLog;
+using System.Threading;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegration.Forms;
+
+namespace BeatrouteTallyIntegration.Controls
+{
+    public partial class ctrlHelpAndSupport : UserControl
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+        public ctrlHelpAndSupport()
+        {
+            InitializeComponent();
+
+
+        }
+
+        private void linkLblOpenSouceLicence_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            try
+            {
+                string fileName = Path.GetDirectoryName(Application.ExecutablePath) + @"\Resources\OpenSourceLicenseAgreements.rtf";
+                if (fileName != null && fileName.Contains("OpenSourceLicenseAgreements.rtf"))
+                {
+                    frmOpenSourceLicenses frm = new frmOpenSourceLicenses();
+                    frm.ShowDialog();
+                }
+                else
+                    MessagePopup.ShowError("There is no such file present");
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+                ErrorLogger.LogError(_logger, "Open Source License Agreement", "ImportWorker|" + Session.UserName + "|Error in file opening of Open Source License agreement" + "^");
+            }
+        }
+
+    }       
+}

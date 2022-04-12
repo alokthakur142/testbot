@@ -1,0 +1,31 @@
+﻿using BeatrouteTallyIntegrationDAL.BusinessRepository.Interface;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.Models.ViewModels;
+using BeatrouteTallyIntegrationDAL.QueryHelperMethods;
+using Dapper;
+using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.BusinessRepository.Class
+{
+    public class CustomerPaymentPostingConfirmationRepository : Repository<CustomerPaymentPostingConfirmation>, ICustomerPaymentPostingConfirmationRepository
+    {
+        public CustomerPaymentPostingConfirmationRepository(string connectionString, ConnectionType connectionType) : base(connectionString, connectionType)
+        {
+
+        }
+        public IEnumerable<CustomerPaymentPostingViewModel> GetCustomerPaymentPostingData()
+        {
+            using (_DbConnection = CreateConnection())
+            {
+                string query = QueryHelper.GetCustomerPaymentPostingDataQuery();
+                IEnumerable<CustomerPaymentPostingViewModel> customerPaymentPostingList = _DbConnection.Query<CustomerPaymentPostingViewModel>(query);
+                return customerPaymentPostingList;
+            }
+        }
+    }
+}

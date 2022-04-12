@@ -1,0 +1,70 @@
+﻿using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationBase.Helpers
+{
+    internal static class HelperFunctions
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+
+        internal static DateTime ParseDateTime(string textDateTime, string fieldName, string apiName)
+        {
+                try
+                {
+                    // Valid date formats
+                    string[] dateFormats = { "dd-MM-yyyy", "dd-MMM-yyyy", "dd/MM/yyyy", "dd/MM/yy", "dd-MM-YY", "dd-MMM-yy", "MM-dd-yyyy", "MM/dd/yyyy", "MM-dd-yy", "MM/dd/yy" };
+                    DateTime dateTime;
+                    Int32 dateTimeNo;
+
+                    if (string.IsNullOrEmpty(textDateTime))
+                    {
+                        ErrorLogger.LogError(_logger,apiName, "ImportWorker|" + Session.UserName + "|Date format is empty for fieldname - " + fieldName + " in API " + apiName + " Response. Taking 2000,1,1 as default date." + "^");
+                        return new DateTime(2000, 1, 1);
+                    }
+
+                    // This block checking is input in number format or not
+                    if (int.TryParse(textDateTime, out dateTimeNo))
+                    {
+                        try
+                        {
+                            // Converting from int value
+                            dateTime = DateTime.FromOADate(dateTimeNo);
+                        }
+                        catch (Exception)
+                        {
+                            throw;
+                        }
+                    }
+
+                    // This block parsing regular date format
+                    else if (!DateTime.TryParse(textDateTime, out dateTime))
+                    {
+                        // Check input date from valid date formats
+                        bool isParsed = DateTime.TryParseExact(textDateTime, dateFormats, new CultureInfo("en-US"),
+                              DateTimeStyles.None, out dateTime);
+                        if (!isParsed)
+                        {
+                            ErrorLogger.LogError(_logger,apiName, "ImportWorker|" + Session.UserName + "|Invalid date format - " + textDateTime + "  for fieldname - " + fieldName + " in API " + apiName + " Response. Taking 2000,1,1 as default date." + "^");
+                            return new DateTime(2000, 1, 1);
+                        }
+                    }
+
+                    return dateTime;
+                }
+                catch (Exception ex)
+                {
+                    _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                    ErrorLogger.LogError(_logger, apiName, "ImportWorker|" + Session.UserName + "|Invalid date format - " + textDateTime + "  for fieldname - " + fieldName + " in API " + apiName + " Response. Taking 2000,1,1 as default date." + "^");
+                    return new DateTime(2000, 1, 1);
+                }         
+        }
+    }
+}

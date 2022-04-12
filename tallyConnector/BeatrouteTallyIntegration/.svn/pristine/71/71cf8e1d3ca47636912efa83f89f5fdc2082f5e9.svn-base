@@ -1,0 +1,183 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.IO;
+using System.Diagnostics;
+using BeatrouteTallyIntegration.Utils;
+using NLog;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationBase.Utils;
+
+namespace BeatrouteTallyIntegration.Controls
+{
+    public partial class ctrlLogs : UserControl
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+
+        public ctrlLogs()
+        {
+            InitializeComponent();
+            lblApiLog.Visible = false;
+            btnSendLogs.Visible = false;
+        }
+
+        private void lblAppLog_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            try
+            {
+                string newPath = Path.GetFullPath(Path.Combine(Application.CommonAppDataPath, @"..\..\"));
+                string filePath = Path.Combine(newPath, "Logs\\AppLog.txt");
+                if (File.Exists(filePath))
+                {
+                    Process.Start(filePath);
+                }
+                else
+                {
+                    MessagePopup.ShowWarning("File doesn't exist on path - " + filePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+
+        private void lblApiLog_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            try
+            {
+                string newPath = Path.GetFullPath(Path.Combine(Application.CommonAppDataPath, @"..\..\"));
+                string filePath = Path.Combine(newPath, "Logs\\ApiLog.txt");
+                if (File.Exists(filePath))
+                {
+                    Process.Start(filePath);
+                }
+                else
+                {
+                    MessagePopup.ShowWarning("File doesn't exist on path - " + filePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+
+        private void btnSendLogs_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                this.Cursor = Cursors.WaitCursor;
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    Login user = uow.Login.GetList().FirstOrDefault();
+                    if(user!=null)
+                    {
+                        if (ImportWorker.PostLogs(user) == true)
+                        {
+                            bool confirm = ImportWorker.PostLogs(user);
+                            if (confirm)
+                            {
+                                MessagePopup.ShowMessage("Logs posted successfully to Beatroute"); 
+                            }
+                            else
+                                MessagePopup.ShowError("Log posting failed.");
+                        }
+                        else
+                            MessagePopup.ShowWarning("Log posting not possible. Log files or directory missing");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+            finally
+            {
+                this.Cursor = Cursors.Default;
+            }
+        }
+        public void RefreshGrid()
+        {
+            try
+            {
+
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    //var logErrorList = uow.ErrorLog.GetList().OrderByDescending(x => x.TimeStamp);
+                    var logErrorList = uow.ErrorLog.GetErrorLogTopData();
+                    dataGridViewErrorLog.DataSource = new BindingSource { DataSource = logErrorList };
+                    dataGridViewErrorLog.Columns["Id"].Visible = false;
+                    dataGridViewErrorLog.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                    dataGridViewErrorLog.AutoResizeColumns();
+                }
+
+                foreach (DataGridViewColumn column in dataGridViewErrorLog.Columns)
+                {
+                    //if (column.Name != "Id" && column.Name != "Api" && column.Name != "Message" && column.Name != "TimeStamp")
+                    //    column.Visible = false;
+                    column.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+        private void ctrlLogs_Load(object sender, EventArgs e)
+        {
+            try
+            {
+                RefreshGrid();               
+                
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+
+        private void lnkLblShowAll_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            try
+            {
+
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    //var logErrorList = uow.ErrorLog.GetList().OrderByDescending(x => x.TimeStamp);
+                    var logErrorList = uow.ErrorLog.GetErrorLogFullData();
+                    dataGridViewErrorLog.DataSource = new BindingSource { DataSource = logErrorList };
+                    dataGridViewErrorLog.Columns["Id"].Visible = false;
+                    dataGridViewErrorLog.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                    dataGridViewErrorLog.AutoResizeColumns();
+                }
+
+                foreach (DataGridViewColumn column in dataGridViewErrorLog.Columns)
+                {
+                    //if (column.Name != "Id" && column.Name != "Api" && column.Name != "Message" && column.Name != "TimeStamp")
+                    //    column.Visible = false;
+                    column.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+        
+    }
+}

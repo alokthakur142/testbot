@@ -1,0 +1,2183 @@
+﻿using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationBase.Tally;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using NLog;
+using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Xml;
+using BeatrouteTallyIntegrationBase.Helpers;
+
+namespace BeatrouteTallyIntegrationBase.Import
+{
+    public class ImportController
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+        private static Logger _httpLogger = LogManager.GetLogger("HttpLog");
+
+        private static Logger _outstanindgsLogger = LogManager.GetLogger("OutstandingLog");
+        private static Logger _skuLogger = LogManager.GetLogger("SKULog");
+        private static Logger _stocksLogger = LogManager.GetLogger("StockLog");
+        private static Logger _salesInvoiceLogger = LogManager.GetLogger("SalesInvoiceLog");
+
+        private int _errorCount = 0;
+
+
+        #region Items
+
+        public void UpdateItems(string companyName, string[] productNames)
+        {
+            try
+            {
+                _errorCount = 0;
+
+                _logger.Info("ImportWorker|" + Session.UserName + "|Sync started for Items" + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                {
+                    Company company = uow.Company.GetList().Where(x => x.CompanyName == companyName).FirstOrDefault();
+                    List<Items> itemsList = new List<Items>();
+                    SyncStatus syncStatusForItem = GetSyncStatusObject(uow, SyncStatusTextMessageHelper.Skus);
+                    SaveSyncStatusInDb(uow, syncStatusForItem, SyncStatusCondition.SyncStarting);
+
+                    if (productNames == null)
+                    {
+                        itemsList = uow.Items.GetList().Where(x => x.CompanyId == company.Guid).ToList();
+                    }
+                    else
+                    {
+                        foreach (string item in productNames)
+                        {
+                            //Subhabrata 23-Jul-2021 : All items containing product name to be considered
+                            List<Items> tempItemsList = uow.Items.GetList().Where(x => x.CompanyId == company.Guid && x.ItemName.Contains(item)).ToList();
+
+                            //if (product != null)
+                            //    itemsList.Add(product);
+                            foreach (Items listItem in tempItemsList)
+                            {
+                                itemsList.Add(listItem);
+                            }
+                        }
+                    }
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Number of Items from database table - " + itemsList.Count() + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                    TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+
+                    Session.IsTallyOpen = true;
+                    if (!tallyConn.IsTallyOpen())
+                    {
+                        ErrorLogger.LogError(_logger, "Items", "ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.IsTallyOpen = false;
+                        SaveSyncStatusInDb(uow, syncStatusForItem, SyncStatusCondition.TallyError);
+                        _skuLogger.Info("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        _skuLogger.Info("");
+                        throw new Exception("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                    }
+
+                    Session.TallyIsEducational = false;
+                    if (tallyConn.IsTallyEducational())
+                    {
+                        ErrorLogger.LogError(_logger, "Items", "ImportWorker|" + Session.UserName + "|Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.TallyIsEducational = true;
+                        SaveSyncStatusInDb(uow, syncStatusForItem, SyncStatusCondition.TallyError);
+                        _skuLogger.Info("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        _skuLogger.Info("");
+
+                        throw new Exception("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                    }
+
+                    Session.IsCompanyOpen = true;
+                    if (!tallyConn.IsCompanyOpenInTally(companyName))
+                    {
+                        ErrorLogger.LogError(_logger, "Items", "ImportWorker|" + Session.UserName + "|Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort + "^");
+                        Session.IsCompanyOpen = false;
+                        SaveSyncStatusInDb(uow, syncStatusForItem, SyncStatusCondition.TallyError);
+                        _skuLogger.Info("Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        _skuLogger.Info("");
+
+                        throw new Exception("Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort + "^");
+                    }
+
+                    int maxAlterId = 0;
+                    if (itemsList.Count() > 0)
+                        maxAlterId = itemsList.Max<Items>(x => x.AlterId);
+
+                    string xml = tallyConn.GetMasters(companyName, maxAlterId, "Stock Item", Constants.ItemsFields);
+
+                    xml = tallyConn.CleanInvalidXmlChars(xml);
+
+                    _httpLogger.Trace("Items xml -\n" + xml);
+                    _httpLogger.Trace("ImportWorker|" + Session.UserName + "|");
+
+                    XmlDocument xmlDocument = new XmlDocument();
+                    using (var sr = new StringReader(xml))
+                    using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                        xmlDocument.Load(xtr);
+
+                    XmlNodeList itemNodes = xmlDocument.SelectNodes("//BODY//DATA//COLLECTION//STOCKITEM");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Received " + itemNodes.Count + " items from Tally" + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                    //Deleting items before inserting
+                    //DeleteItems(company.Id, uow);
+
+                    foreach (XmlNode node in itemNodes)
+                    {
+                        int itemAlterId = TallyUtil.ReadInt(node, "ALTERID");
+                        int itemMasterId = TallyUtil.ReadInt(node, "MASTERID");
+                        string itemId = TallyUtil.ReadString(node, "GUID");
+                        Guid companyId = company.Id;
+
+                        //Deleting items before inserting
+                        // _logger.Debug("Deleting Items before inserting.");
+                        // _logger.Debug("");
+                        List<Items> itemList = uow.Items.GetList().Where(x => x.CompanyId == company.Guid && x.MasterId == itemMasterId).ToList();
+                        foreach (Items item in itemList)
+                        {
+                            uow.Items.Delete(item.Id);
+                        }
+                        //_logger.Info("Deletion completed for Items. Starting insertion.");
+                        //_logger.Info("");
+
+                        string itemName = TallyUtil.ReadAttribute(node, "NAME");
+                        string alias = TallyUtil.ReadInnerNode(node, "NAME", "LANGUAGENAME.LIST/NAME.LIST/", 1);
+                        string itemGroup = TallyUtil.ReadString(node, "PARENT");
+                        string itemCategory = TallyUtil.ReadString(node, "CATEGORY");
+                        string partCode = TallyUtil.ReadInnerNode(node, "MAILINGNAME", "MAILINGNAME.LIST/", 0);
+                        string unitOfMeasure = TallyUtil.ReadString(node, "BASEUNITS");
+                        string altUnitOfMeasure = TallyUtil.ReadString(node, "ADDITIONALUNITS");
+                        string conversionNumerator = TallyUtil.ReadString(node, "CONVERSION");
+                        string conversionDenominator = TallyUtil.ReadString(node, "DENOMINATOR");
+
+                        //CreateOrModifyItems(uow, company, itemAlterId, itemId, companyId, itemName, itemGroup, itemCategory, partCode, unitOfMeasure, altUnitOfMeasure, conversionNumerator, conversionDenominator);
+
+                        #region Creating Items and Adding to db
+
+                        Items items = new Items();
+                        items.MasterId = itemMasterId;
+                        items.AlterId = itemAlterId;
+                        items.CompanyId = company.Guid;
+                        items.ItemId = itemId;
+                        items.ItemName = itemName.Trim();
+                        items.ItemAliasName = alias.Trim();
+                        items.ItemGroup = itemGroup;
+                        items.ItemCategory = itemCategory;
+                        items.PartCode = partCode.Trim();
+                        items.UnitOfMeasure = unitOfMeasure;
+                        items.AltUnitOfMeasure = altUnitOfMeasure;
+                        items.ConversionNumerator = conversionNumerator;
+                        items.ConversionDenominator = conversionDenominator;
+                        items.ImportedOn = DateTime.Now;
+                        items.IsDeleted = false;
+                        items.IsPosted = false;
+                        items.PostedOn = new DateTime(2000, 1, 1);
+                        items.PostingMessage = string.Empty;
+
+                        uow.Items.Add(items);
+
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|Item - " + items.ItemName + " Company - " + company.CompanyName + " added to database" + "^");
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                        #endregion
+                    }
+                    CheckDeletedItems(company, uow);
+                    SaveSyncStatusInDb(uow, syncStatusForItem, SyncStatusCondition.SyncEnded);
+                }
+                _logger.Info("ImportWorker|" + Session.UserName + "|Sync Completed for Items" + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+            catch (Exception ex)
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                {
+                    if (ex.Message.Contains("SQL logic error"))
+                    {
+                        ErrorLogger.LogError(_logger, "Items", "ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                    }
+                    else
+                    {
+                        SyncStatus syncStatusForItem = GetSyncStatusObject(uow, SyncStatusTextMessageHelper.Skus);
+                        SaveSyncStatusInDb(uow, syncStatusForItem, SyncStatusCondition.TallyError);
+                        _skuLogger.Info("ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                        _skuLogger.Info("");
+                        throw;
+                    }
+                }
+            }
+        }
+
+        private void CheckDeletedItems(Company company, UnitOfWork uow)
+        {
+            try
+            {
+                TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+                List<string> guidList = new List<string>();
+
+                Session.IsTallyOpen = true;
+                if (!tallyConn.IsTallyOpen())
+                {
+                    ErrorLogger.LogError(_logger, "Items", "ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                    Session.IsTallyOpen = false;
+                    throw new Exception("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                }
+
+                Session.TallyIsEducational = false;
+                if (tallyConn.IsTallyEducational())
+                {
+                    ErrorLogger.LogError(_logger, "Items", "ImportWorker|" + Session.UserName + "|Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                    Session.TallyIsEducational = true;
+                    throw new Exception("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                }
+
+                Session.IsCompanyOpen = true;
+                if (!tallyConn.IsCompanyOpenInTally(company.CompanyName))
+                {
+                    ErrorLogger.LogError(_logger, "Items", "ImportWorker|" + Session.UserName + "|Checking deleted Items: Company " + company.CompanyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort + "^");
+                    Session.IsCompanyOpen = false;
+                    throw new Exception("Company " + company.CompanyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort);
+                }
+
+                var itemsList = uow.Items.GetList().Where(x => x.CompanyId == company.Guid).ToList();
+                if (itemsList.Count == 0)
+                {
+                    ErrorLogger.LogError(_logger, "Items", "ImportWorker|" + Session.UserName + "|No items found in database for Company: " + company.CompanyName + "^");
+                    return;
+                }
+
+                string xml = tallyConn.GetMasters(company.CompanyName, 0, "Stock Item", Constants.ItemsFields);
+
+                xml = tallyConn.CleanInvalidXmlChars(xml);
+
+                _httpLogger.Trace("Item xml -\n" + xml);
+                _httpLogger.Trace("");
+
+                XmlDocument xmlDocument = new XmlDocument();
+                using (var sr = new StringReader(xml))
+                using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                    xmlDocument.Load(xtr);
+
+                XmlNodeList itemNodes = xmlDocument.SelectNodes("//BODY//DATA//COLLECTION//STOCKITEM");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|Received " + itemNodes.Count + " items from Tally" + "^");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                foreach (XmlNode node in itemNodes)
+                {
+                    string guid = TallyUtil.ReadString(node, "GUID");
+                    guidList.Add(guid);
+                }
+
+                foreach (Items item in itemsList)
+                {
+                    if (guidList.Contains(item.ItemId))
+                        continue;
+                    else
+                    {
+                        item.IsDeleted = true;
+                        uow.Items.Update(item);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("SQL logic error"))
+                {
+                    ErrorLogger.LogError(_logger, "Items", "ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                }
+                else
+                    throw;
+            }
+        }
+
+        #endregion
+
+        #region Company
+
+        public void GetCompanyDetails(string companyName)
+        {
+            try
+            {
+                TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+
+                Session.IsTallyOpen = true;
+                if (!tallyConn.IsTallyOpen())
+                {
+                    ErrorLogger.LogError(_logger, "Company", "ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                    Session.IsTallyOpen = false;
+                    throw new Exception("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                }
+
+                Session.TallyIsEducational = false;
+                if (tallyConn.IsTallyEducational())
+                {
+                    ErrorLogger.LogError(_logger, "Company", "ImportWorker|" + Session.UserName + "|Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                    Session.TallyIsEducational = true;
+                    throw new Exception("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                }
+
+                Session.IsCompanyOpen = true;
+                if (!tallyConn.IsCompanyOpenInTally(companyName))
+                {
+                    ErrorLogger.LogError(_logger, "Company", "ImportWorker|" + Session.UserName + "|Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort + "^");
+                    Session.IsCompanyOpen = false;
+                    throw new Exception("Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort);
+                }
+
+                _logger.Info("ImportWorker|" + Session.UserName + "|Sync started for Companies" + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                {
+                    string xml = tallyConn.GetCompanyDetails(companyName, Constants.CompanyFields);
+
+                    xml = tallyConn.CleanInvalidXmlChars(xml);
+
+                    _httpLogger.Trace("Company xml -\n" + xml);
+                    _httpLogger.Trace("");
+
+                    XmlDocument xmlDocument = new XmlDocument();
+                    using (var sr = new StringReader(xml))
+                    using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                        xmlDocument.Load(xtr);
+
+                    XmlNode node = xmlDocument.SelectSingleNode("//BODY//DATA//COLLECTION//COMPANY");
+                    string guid = TallyUtil.ReadString(node, "GUID");
+                    Company company = uow.Company.GetList().Where(x => x.CompanyName == companyName).FirstOrDefault();
+                    //var activeCompanyList = uow.Company.GetList().Where(x => x.IsActive).ToList();
+                    bool setActive = true;
+                    //if (activeCompanyList.Count > 0)
+                    //    setActive = false;
+                    //else
+                    //    setActive = true;
+                    if (company == null)
+                    {
+                        company = new Company();
+                        company.CompanyName = companyName;
+                        company.CustomerInvoice = true;
+                        company.CustomerMaster = true;
+                        company.CustomerOrder = true;
+                        company.CustomerOutstanding = true;
+                        company.CustomerPayment = true;
+                        company.ProductMaster = true;
+                        company.Stock = true;
+                        company.OrderStatus = true;
+                        company.SalesOrderDeletionChceking = true;
+                        company.IsActive = setActive;
+                        company.Guid = guid;
+                        company.ImportedOn = DateTime.Now;
+
+                        uow.Company.Add(company);
+                        _logger.Info("ImportWorker|" + Session.UserName + "|Company added: " + company.CompanyName + "^");
+                        _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                    }
+                    else
+                    {
+                        company.CompanyName = companyName;
+                        company.IsActive = setActive;
+                        company.Guid = guid;
+                        company.ImportedOn = DateTime.Now;
+
+                        uow.Company.Update(company);
+                        _logger.Info("ImportWorker|" + Session.UserName + "|Company updated: " + company.CompanyName + "^");
+                        _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                    }
+                }
+                _logger.Info("ImportWorker|" + Session.UserName + "|Sync Completed for Companies" + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("SQL logic error"))
+                {
+                    ErrorLogger.LogError(_logger, "Company", "ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                }
+                else
+                    throw;
+            }
+        }
+
+        public void UpdateCompanyName()
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(UnitOfWork.GetConnectionString(), ConnectionType.SQLite))
+                {
+                    DateTime importedOn = DateTime.Now;
+                    TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+
+                    Session.IsTallyOpen = true;
+                    if (!tallyConn.IsTallyOpen())
+                    {
+                        ErrorLogger.LogError(_logger, "Company ", "ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.IsTallyOpen = false;
+                        return;
+                    }
+
+                    Session.TallyIsEducational = false;
+                    if (tallyConn.IsTallyEducational())
+                    {
+                        Session.TallyIsEducational = true;
+                        ErrorLogger.LogError(_logger, "Company ", "ImportWorker|" + Session.UserName + "|Tally is running in education mode for IP: " + Session.TallyIp + " and PORT: " + Session.TallyPort + "^");
+                        return;
+                    }
+
+                    string[] companies = tallyConn.GetCompaniesOpenInTally();
+
+                    foreach (string companyName in companies)
+                    {
+                        if (string.IsNullOrEmpty(companyName))
+                            continue;
+
+                        string xml = tallyConn.GetCompanyDetails(companyName, Constants.CompanyFields);
+
+                        xml = tallyConn.CleanInvalidXmlChars(xml);
+
+                        _httpLogger.Trace("Company xml -\n" + xml);
+                        _httpLogger.Trace("");
+
+                        XmlDocument xmlDocument = new XmlDocument();
+                        using (var sr = new StringReader(xml))
+                        using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                            xmlDocument.Load(xtr);
+
+                        XmlNode node = xmlDocument.SelectSingleNode("//BODY//DATA//COLLECTION//COMPANY");
+
+                        string guid = TallyUtil.ReadString(node, "GUID");
+
+                        Company company = uow.Company.GetList().Where(x => x.Guid == guid).FirstOrDefault();
+                        if (company == null)
+                        {
+                            continue;
+                        }
+
+                        //RK Only if the name is different then run the update
+                        //If we have more fields in company master then this condition will need to be changed
+                        if (company.CompanyName != companyName)
+                        {
+                            company.CompanyName = companyName;
+                            company.ImportedOn = importedOn;
+
+                            uow.Company.Update(company);
+
+                            _logger.Info("ImportWorker|" + Session.UserName + "|" + string.Format("Company {0} updated", company.CompanyName) + "^");
+                            _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+
+        #endregion
+
+        #region Customers
+
+        public void UpdateCustomers(string companyName)
+        {
+            try
+            {
+                _errorCount = 0;
+
+                _logger.Debug("ImportWorker|" + Session.UserName + "|Sync started for Customers" + "^");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                {
+                    Company company = uow.Company.GetList().Where(x => x.CompanyName == companyName).FirstOrDefault();
+
+                    
+
+                    List<Customers> customersList = uow.Customers.GetList().Where(x => x.CompanyId == company.Guid).ToList();
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Number of Customers from database table - " + customersList.Count() + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                    TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+
+                    Session.IsTallyOpen = true;
+                    if (!tallyConn.IsTallyOpen())
+                    {
+                        ErrorLogger.LogError(_logger, "Customer", "ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.IsTallyOpen = false;
+                        throw new Exception("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                    }
+
+                    Session.TallyIsEducational = false;
+                    if (tallyConn.IsTallyEducational())
+                    {
+                        ErrorLogger.LogError(_logger, "Customer", "ImportWorker|" + Session.UserName + "|Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.TallyIsEducational = true;
+                        throw new Exception("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                    }
+
+                    Session.IsCompanyOpen = true;
+                    if (!tallyConn.IsCompanyOpenInTally(companyName))
+                    {
+                        ErrorLogger.LogError(_logger, "Customer", "ImportWorker|" + Session.UserName + "|Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort + "^");
+                        Session.IsCompanyOpen = false;
+                        throw new Exception("Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort);
+                    }
+
+                    int maxAlterId = 0;
+                    if (customersList.Count() > 0)
+                        maxAlterId = customersList.Max<Customers>(x => x.AlterId);
+
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Max Alter Id: " + maxAlterId + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                    string xml = tallyConn.GetMasters(companyName, maxAlterId, "Ledgers", Constants.LedgerFields);
+
+                    xml = tallyConn.CleanInvalidXmlChars(xml);
+
+                    _httpLogger.Trace("Customer xml -\n" + xml);
+                    _httpLogger.Trace("");
+
+                    XmlDocument xmlDocument = new XmlDocument();
+                    using (var sr = new StringReader(xml))
+                    using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                        xmlDocument.Load(xtr);
+
+                    XmlNodeList customerNodes = xmlDocument.SelectNodes("//BODY//DATA//COLLECTION//LEDGER");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Received " + customerNodes.Count + " customers from Tally" + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                    foreach (XmlNode node in customerNodes)
+                    {
+                        int customerAlterId = TallyUtil.ReadInt(node, "ALTERID");
+                        Guid companyId = company.Id;
+                        string primaryGroup = TallyUtil.ReadString(node, "_PRIMARYGROUP");
+                        string customerName = TallyUtil.ReadAttribute(node, "NAME");
+                        int masterId = Convert.ToInt32(TallyUtil.ReadString(node, "MASTERID"));
+                        string guid = TallyUtil.ReadString(node, "GUID");
+                        //Deleting customers before inserting
+                        //_logger.Debug("Deleting Customers before inserting.");
+                        //_logger.Debug("");
+                        var customerList = uow.Customers.GetList().Where(x => x.CompanyId == company.Guid && x.MasterId == masterId);
+                        foreach (Customers customer in customerList)
+                        {
+                            uow.Customers.Delete(customer.Id);
+                        }
+                        // _logger.Debug("Deletion of customer completed. Starting insertion.");
+                        // _logger.Debug("");
+
+                        string keyContactPerson = TallyUtil.ReadString(node, "LEDGERCONTACT");
+                        string email = TallyUtil.ReadString(node, "EMAIL");
+                        string mobile = TallyUtil.ReadString(node, "LEDGERMOBILE");
+                        string address1 = TallyUtil.ReadInnerNode(node, "ADDRESS", "ADDRESS.LIST/", 0);
+                        string address2 = TallyUtil.ReadInnerNode(node, "ADDRESS", "ADDRESS.LIST/", 1);
+                        string address3 = TallyUtil.ReadInnerNode(node, "ADDRESS", "ADDRESS.LIST/", 2);
+                        string state = TallyUtil.ReadString(node, "LEDSTATENAME");
+                        string pinCode = TallyUtil.ReadString(node, "PINCODE");
+                        decimal creditLimit = TallyUtil.ReadDecimal(node, "CREDITLIMIT");
+                        string pan = TallyUtil.ReadString(node, "INCOMETAXNUMBER");
+                        string gstNo = TallyUtil.ReadString(node, "PARTYGSTIN");
+                        string gstRegistrationType = TallyUtil.ReadString(node, "GSTREGISTRATIONTYPE");
+
+                        if (primaryGroup.Contains("Sundry Debtors"))
+                        {
+                            //CreatOrModifyCustomers(uow, company, customerAlterId, companyId, customerName, keyContactPerson, email, mobile, pan, address1, address2, address3, state, pinCode, gstNo, creditLimit);
+
+                            #region Creating Customers and Adding to db
+                            Customers customers = new Customers();
+                            customers.AlterId = customerAlterId;
+                            customers.MasterId = masterId;
+                            customers.CompanyId = company.Guid;
+                            customers.CustomerId = guid;
+                            customers.CustomerName = customerName.Trim();
+                            customers.KeyContactPerson = keyContactPerson;
+                            customers.Email = email;
+                            customers.Mobile = mobile;
+                            customers.Address1 = address1;
+                            customers.Address2 = address2;
+                            customers.Address3 = address3;
+                            customers.State = state;
+                            customers.PinCode = pinCode;
+                            customers.CreditLimit = creditLimit;
+                            customers.Guid = guid;
+                            customers.ImportedOn = DateTime.Now;
+                            customers.PostedOn = new DateTime(2000, 01, 01);
+                            customers.IsPosted = false;
+                            customers.PostingMessage = "";
+                            customers.IsDeleted = false;
+                            customers.Pan = pan.Trim();
+                            customers.GstNo = gstNo.Trim();
+                            customers.GstRegistrationType = gstRegistrationType;
+
+                            uow.Customers.Add(customers);
+
+                            _logger.Debug("ImportWorker|" + Session.UserName + "|Customer - " + customerName + " from Company - " + companyName + " added to database" + "^");
+                            _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                            #endregion
+                        }
+
+                        primaryGroup = primaryGroup.ToUpper();
+                        if (primaryGroup == "CASH-IN-HAND" || primaryGroup == "BANK ACCOUNTS")
+                        {
+                            #region Creating Ledgers and Adding to db
+
+                            //Subhabrata 24-Sep-2021 : Bug fix for ledger update
+                            Ledgers ledger = uow.Ledgers.GetList().Where(x => x.CompanyId == company.Guid && x.LedgerId == guid).FirstOrDefault();
+                            if (ledger == null)
+                            {
+                                ledger = new Ledgers();
+                                ledger.AlterId = customerAlterId;
+                                ledger.MasterId = masterId;
+                                ledger.CompanyId = company.Guid;
+                                ledger.LedgerId = guid;
+                                ledger.LedgerName = customerName;
+                                ledger.LedgerGroup = primaryGroup;
+                                ledger.KeyContactPerson = keyContactPerson;
+                                ledger.Email = email;
+                                ledger.Mobile = mobile;
+                                ledger.Pan = pan;
+                                ledger.Address1 = address1;
+                                ledger.Address2 = address2;
+                                ledger.Address3 = address3;
+                                ledger.State = state;
+                                ledger.PinCode = pinCode;
+                                ledger.GstNo = gstNo;
+                                ledger.CreditLimit = creditLimit;
+                                ledger.Guid = guid;
+
+                                uow.Ledgers.Add(ledger);
+                            }
+                            else
+                            {
+                                ledger.AlterId = customerAlterId;
+                                ledger.MasterId = masterId;
+                                ledger.CompanyId = company.Guid;
+                                ledger.LedgerId = guid;
+                                ledger.LedgerName = customerName;
+                                ledger.LedgerGroup = primaryGroup;
+                                ledger.KeyContactPerson = keyContactPerson;
+                                ledger.Email = email;
+                                ledger.Mobile = mobile;
+                                ledger.Pan = pan;
+                                ledger.Address1 = address1;
+                                ledger.Address2 = address2;
+                                ledger.Address3 = address3;
+                                ledger.State = state;
+                                ledger.PinCode = pinCode;
+                                ledger.GstNo = gstNo;
+                                ledger.CreditLimit = creditLimit;
+                                ledger.Guid = guid;
+
+                                uow.Ledgers.Update(ledger);
+                            }
+
+                            _logger.Debug("ImportWorker|" + Session.UserName + "|Ledger - " + customerName + " from Company - " + companyName + " added to database" + "^");
+                            _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                            #endregion
+                        }
+                    }
+                    CheckDeletedCustomers(company, uow);
+
+                    
+                }
+
+                _logger.Debug("ImportWorker|" + Session.UserName + "|Sync completed for Customers" + "^");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+            }
+            catch (Exception ex)
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                {
+                    if (ex.Message.Contains("SQL logic error"))
+                    {
+                        ErrorLogger.LogError(_logger, "Customers", "ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                    }
+                    else
+                    {
+                        SyncStatus syncStatusForCustomer = GetSyncStatusObject(uow, SyncStatusTextMessageHelper.Outstandings);
+                        SaveSyncStatusInDb(uow, syncStatusForCustomer, SyncStatusCondition.TallyError);
+                        _outstanindgsLogger.Info("ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                        _outstanindgsLogger.Info("");
+                        throw;
+                    } 
+                }
+            }
+        }
+
+        private void CheckDeletedCustomers(Company company, UnitOfWork uow)
+        {
+            try
+            {
+                TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+                List<string> guidList = new List<string>();
+
+                Session.IsTallyOpen = true;
+                if (!tallyConn.IsTallyOpen())
+                {
+                    ErrorLogger.LogError(_logger, "Customer", "ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                    Session.IsTallyOpen = false;
+                    throw new Exception("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                }
+
+                Session.TallyIsEducational = false;
+                if (tallyConn.IsTallyEducational())
+                {
+                    ErrorLogger.LogError(_logger, "Customer", "ImportWorker|" + Session.UserName + "|Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                    Session.TallyIsEducational = true;
+                    throw new Exception("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                }
+
+                Session.IsCompanyOpen = true;
+                if (!tallyConn.IsCompanyOpenInTally(company.CompanyName))
+                {
+                    ErrorLogger.LogError(_logger, "Customer", "ImportWorker|" + Session.UserName + "|Checking deleted Customers error - Company " + company.CompanyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort + "^");
+                    Session.IsCompanyOpen = false;
+                    throw new Exception("Company " + company.CompanyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort);
+                }
+
+                var customerList = uow.Customers.GetList().Where(x => x.CompanyId == company.Guid).ToList();
+                if (customerList.Count == 0)
+                {
+                    ErrorLogger.LogError(_logger, "Customer", "ImportWorker|" + Session.UserName + "|No customers found in database for Company: " + company.CompanyName + "^");
+                    return;
+                }
+
+                string xml = tallyConn.GetMasters(company.CompanyName, 0, "Ledgers", Constants.LedgerFields);
+
+                xml = tallyConn.CleanInvalidXmlChars(xml);
+
+                _httpLogger.Trace("Customer xml -\n" + xml);
+                _httpLogger.Trace("");
+
+                XmlDocument xmlDocument = new XmlDocument();
+                using (var sr = new StringReader(xml))
+                using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                    xmlDocument.Load(xtr);
+
+                XmlNodeList customerNodes = xmlDocument.SelectNodes("//BODY//DATA//COLLECTION//LEDGER");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|Received " + customerNodes.Count + " customers from Tally" + "^");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                foreach (XmlNode node in customerNodes)
+                {
+                    string guid = TallyUtil.ReadString(node, "GUID");
+                    guidList.Add(guid);
+                }
+
+                foreach (Customers customer in customerList)
+                {
+                    if (guidList.Contains(customer.Guid))
+                        continue;
+                    else
+                    {
+                        customer.IsDeleted = true;
+                        uow.Customers.Update(customer);
+                    }
+                }
+
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("SQL logic error"))
+                {
+                    ErrorLogger.LogError(_logger, "Customers", "ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                }
+                else
+                    throw;
+            }
+        }
+
+        #endregion
+
+        #region SalesInvoice
+        public void UpdateSalesInvoice(string companyName)
+        {
+            try
+            {
+                _errorCount = 0;
+
+                DateTime importDate = DateTime.Now;
+                int invoice_Import_Days = 30;   //ToDo configure it from a constant field
+                DateTime startDate = DateTime.Now.AddDays(invoice_Import_Days * -1);
+                DateTime endDate = DateTime.Now;
+
+                _logger.Info("ImportWorker|" + Session.UserName + "|Sync started for Sales Invoices" + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                {
+                    Company company = uow.Company.GetList().Where(x => x.CompanyName == companyName).FirstOrDefault();
+                    List<SalesInvoice> invoiceList = uow.SalesInvoice.GetList().Where(x => x.CompanyId == company.Guid).ToList();
+
+                    SyncStatus syncStatusForSalesInvoice = GetSyncStatusObject(uow, SyncStatusTextMessageHelper.SalesInvoices);
+                    SaveSyncStatusInDb(uow, syncStatusForSalesInvoice, SyncStatusCondition.SyncStarting);
+
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Number of Invoices in database table - " + invoiceList.Count() + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                    int maxAlterId = -1;
+                    if (invoiceList.Count > 0)
+                        maxAlterId = invoiceList.Max<SalesInvoice>(x => x.AlterId);
+
+                    TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+
+                    Session.IsTallyOpen = true;
+                    if (!tallyConn.IsTallyOpen())
+                    {
+                        ErrorLogger.LogError(_logger, "Sales Invoice", "ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.IsTallyOpen = false;
+                        SaveSyncStatusInDb(uow, syncStatusForSalesInvoice, SyncStatusCondition.TallyError);
+                        _salesInvoiceLogger.Info("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        _salesInvoiceLogger.Info("");
+                        throw new Exception("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                    }
+
+                    Session.TallyIsEducational = false;
+                    if (tallyConn.IsTallyEducational())
+                    {
+                        ErrorLogger.LogError(_logger, "Sales Invoice", "ImportWorker|" + Session.UserName + "|Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.TallyIsEducational = true;
+                        SaveSyncStatusInDb(uow, syncStatusForSalesInvoice, SyncStatusCondition.TallyError);
+                        _salesInvoiceLogger.Info("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        _salesInvoiceLogger.Info("");
+                        throw new Exception("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                    }
+
+                    Session.IsCompanyOpen = true;
+                    if (!tallyConn.IsCompanyOpenInTally(companyName))
+                    {
+                        ErrorLogger.LogError(_logger, "Sales Invoice", "ImportWorker|" + Session.UserName + "|Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort + "^");
+                        Session.IsCompanyOpen = false;
+                        SaveSyncStatusInDb(uow, syncStatusForSalesInvoice, SyncStatusCondition.TallyError);
+                        _salesInvoiceLogger.Info("Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        _salesInvoiceLogger.Info("");
+                        throw new Exception("Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort);
+                    }
+
+                    string xml = tallyConn.GetInvoice(companyName, Constants.VoucherFields, startDate, endDate, maxAlterId);
+
+                    xml = tallyConn.CleanInvalidXmlChars(xml);
+
+                    _httpLogger.Trace("Sales Invoice xml -\n" + xml);
+                    _httpLogger.Trace("");
+
+                    XmlDocument xmlDocument = new XmlDocument();
+                    using (var sr = new StringReader(xml))
+                    using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                        xmlDocument.Load(xtr);
+
+                    XmlNodeList voucherNodes = xmlDocument.SelectNodes("//BODY//DATA//COLLECTION//VOUCHER");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Received " + voucherNodes.Count + " invoices from Tally" + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+
+                    foreach (XmlNode node in voucherNodes)
+                    {
+                        int masterId = TallyUtil.ReadInt(node, "MASTERID");
+                        int alterId = TallyUtil.ReadInt(node, "ALTERID");
+                        int voucherMasterId = TallyUtil.ReadInt(node, "VOUCHERMASTERID");
+
+                        #region Deletion Before Inserting
+                        List<SalesInvoice> salesInvoiceList = uow.SalesInvoice.GetList().Where(x => x.MasterId == voucherMasterId && x.CompanyId == company.Guid).ToList();
+                        foreach (SalesInvoice invoice in salesInvoiceList)
+                        {
+                            List<SalesInvoiceItemLines> salesItemsList = uow.SalesInvoiceItemLines.GetList().Where(x => x.InvoiceId == invoice.SalesInvoiceId).ToList();
+                            foreach (SalesInvoiceItemLines itemLine in salesItemsList)
+                            {
+                                uow.SalesInvoiceItemLines.Delete(itemLine.Id);
+                            }
+
+                            List<TaxAndChargesLines> taxAndChargesLinesList = uow.TaxAndChargesLines.GetList().Where(x => x.SalesInvoiceId == invoice.SalesInvoiceId).ToList();
+                            foreach (TaxAndChargesLines taxLine in taxAndChargesLinesList)
+                            {
+                                uow.TaxAndChargesLines.Delete(taxLine.Id);
+                            }
+
+                            uow.SalesInvoice.Delete(invoice.Id);
+                        }
+                        #endregion
+
+                        string salesInvoiceId = TallyUtil.ReadString(node, "GUID");
+                        string beatrouteOrderId = String.Empty;
+                        string transactionType = TallyUtil.ReadString(node, "VOUCHERTYPENAME");
+                        string originalInvoiceNo = TallyUtil.ReadString(node, "REFERENCE");
+                        Guid companyId = company.Id;
+                        DateTime originalInvoiceDate = TallyUtil.ReadDate(node, "DATE", "YYYYMMDD");
+
+                        bool isDebitNote = TallyUtil.ReadBool(node, "ISDEBITNOTE");
+                        bool isCreditNote = TallyUtil.ReadBool(node, "ISCREDITNOTE");
+                        bool isSales = TallyUtil.ReadBool(node, "CLASSIFICATIONISSALES");
+
+                        string voucherType = String.Empty;
+                        if (isDebitNote)
+                            voucherType = "Debit Note";
+                        else if (isCreditNote)
+                            voucherType = "Credit Note";
+                        else if (isSales)
+                            voucherType = "Sales";
+
+                        string salesInvoiceNo = TallyUtil.ReadString(node, "VOUCHERNUMBER");
+                        DateTime salesInvoiceDate = TallyUtil.ReadDate(node, "DATE", "YYYYMMDD");
+                        //string customerId = TallyUtil.ReadString(node, "MASTERID");
+                        string buyerCustomerName = TallyUtil.ReadString(node, "BASICBASEPARTYNAME");
+                        string buyerAddress1 = TallyUtil.ReadInnerNode(node, "ADDRESS", "ADDRESS.LIST/", 0);
+                        string buyerAddress2 = TallyUtil.ReadInnerNode(node, "ADDRESS", "ADDRESS.LIST/", 1);
+                        string buyerAddress3 = TallyUtil.ReadInnerNode(node, "ADDRESS", "ADDRESS.LIST/", 2);
+                        string buyerState = TallyUtil.ReadString(node, "STATENAME");
+                        string buyerPin = TallyUtil.ReadString(node, "PARTYPINCODE");
+                        string buyerGstin = TallyUtil.ReadString(node, "PARTYGSTIN");
+                        string shipToCustomerName = TallyUtil.ReadString(node, "BASICBUYERNAME");
+                        string shipToAddress1 = TallyUtil.ReadInnerNode(node, "BASICBUYERADDRESS", "BASICBUYERADDRESS.LIST/", 0);
+                        string shipToAddress2 = TallyUtil.ReadInnerNode(node, "BASICBUYERADDRESS", "BASICBUYERADDRESS.LIST/", 1);
+                        string shipToAddress3 = TallyUtil.ReadInnerNode(node, "BASICBUYERADDRESS", "BASICBUYERADDRESS.LIST/", 2);
+                        string shipToState = TallyUtil.ReadString(node, "CONSIGNEESTATENAME");
+                        string shipToGstin = TallyUtil.ReadString(node, "CONSIGNEEGSTIN");
+                        string paymentTerms = TallyUtil.ReadString(node, "BASICDUEDATEOFPYMT");
+                        string narration = TallyUtil.ReadString(node, "NARRATION");
+
+                        string partyLedgerName = TallyUtil.ReadString(node, "PARTYLEDGERNAME");
+
+                        Customers customer = uow.Customers.GetList().Where(x => x.CompanyId == company.Guid && x.CustomerName == partyLedgerName).FirstOrDefault();
+                        if (customer == null)
+                        {
+                            ErrorLogger.LogError(_logger, "Sales Invoice", "ImportWorker|" + Session.UserName + "|Sales Invoice Voucher No - " + salesInvoiceNo + " sync failed because customer - " + partyLedgerName + " is not synced" + "^");
+                            SaveSyncStatusInDb(uow, syncStatusForSalesInvoice, SyncStatusCondition.TallyError);
+                            _salesInvoiceLogger.Info("ImportWorker|" + Session.UserName + "|Sales Invoice Voucher No - " + salesInvoiceNo + " sync failed because customer - " + partyLedgerName + " is not synced" + "^");
+                            _salesInvoiceLogger.Info("");
+                            continue;
+                        }
+
+                        #region Creating and Adding SalesInvoice to db
+                        SalesInvoice salesInvoice = new SalesInvoice();
+                        salesInvoice.MasterId = voucherMasterId;
+                        salesInvoice.AlterId = alterId;
+                        salesInvoice.SalesInvoiceId = salesInvoiceId;
+                        salesInvoice.BeatrouteOrderId = beatrouteOrderId;
+                        salesInvoice.TransactionType = transactionType;
+                        salesInvoice.OriginalInvoiceNo = originalInvoiceNo;
+                        salesInvoice.OriginalInvoiceDate = originalInvoiceDate;
+                        salesInvoice.CompanyId = company.Guid;
+                        salesInvoice.VoucherType = voucherType;
+                        salesInvoice.SalesInvoiceNo = salesInvoiceNo;
+                        salesInvoice.SalesInvoiceDate = salesInvoiceDate;
+                        salesInvoice.CustomerId = customer.Guid;
+                        salesInvoice.BuyerCustomerName = buyerCustomerName;
+                        salesInvoice.BuyerAddress1 = buyerAddress1;
+                        salesInvoice.BuyerAddress2 = buyerAddress2;
+                        salesInvoice.BuyerAddress3 = buyerAddress3;
+                        salesInvoice.BuyerState = buyerState;
+                        salesInvoice.BuyerGstin = buyerGstin;
+                        salesInvoice.ShipToCustomerName = shipToCustomerName;
+                        salesInvoice.ShipToAddress1 = shipToAddress1;
+                        salesInvoice.ShipToAddress2 = shipToAddress2;
+                        salesInvoice.ShipToAddress3 = shipToAddress3;
+                        salesInvoice.ShipToState = shipToState;
+                        salesInvoice.ShipToGstin = shipToGstin;
+                        salesInvoice.PaymentTerms = paymentTerms;
+                        salesInvoice.Narration = narration;
+                        salesInvoice.ImportedOn = DateTime.Now;
+                        salesInvoice.IsDeleted = false;
+                        salesInvoice.IsPosted = false;
+                        salesInvoice.PostedOn = new DateTime(2000, 01, 01);
+                        salesInvoice.PostingMessage = "";
+
+                        uow.SalesInvoice.Add(salesInvoice);
+
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|Sales Invoice No - " + salesInvoiceNo + "Date - " + salesInvoiceDate + " from Company - " + companyName + " added to database" + "^");
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                        #endregion
+
+
+                        XmlNodeList ledgerEntriesList = node.SelectNodes("./ALLLEDGERENTRIES.LIST");
+                        foreach (XmlNode ledgerEntry in ledgerEntriesList)
+                        {
+
+                            string ledgerName = TallyUtil.ReadString(ledgerEntry, "LEDGERNAME");
+                            XmlNodeList inventoryAllocationsList = ledgerEntry.SelectNodes("./INVENTORYALLOCATIONS.LIST");
+                            foreach (XmlNode inventory in inventoryAllocationsList)
+                            {
+                                //Guid itemId = 
+                                string itemName = TallyUtil.ReadString(inventory, "STOCKITEMNAME");
+                                string hsn = TallyUtil.ReadString(inventory, "ITEMHSNCODE");
+                                if (hsn.Contains("Not Found"))
+                                    hsn = "";
+                                TallyQuantity actualQty = TallyUtil.ReadQty(inventory, "ACTUALQTY");
+                                decimal qty = actualQty.Quantity;
+                                TallyRate Rate = TallyUtil.ReadRate(inventory, "RATE");
+                                TallyAmount rate = Rate.Rate;
+                                TallyAmount actualAmount = TallyUtil.ReadAmount(inventory, "AMOUNT");
+                                decimal amount = actualAmount.BaseCurrencyAmount;
+                                decimal actualRate = rate.BaseCurrencyAmount;
+                                decimal discount = TallyUtil.ReadDecimal(inventory, "DISCOUNT");
+                                decimal taxRate = TallyUtil.ReadDecimal(inventory, "ITEMGSTRATE");
+
+
+                                #region Creating and Adding SalesInvoiceItemLines to db
+
+                                Items item = uow.Items.GetList().Where(x => x.CompanyId == company.Guid && x.ItemName == itemName).FirstOrDefault();
+                                if (item == null)
+                                    continue;
+
+                                SalesInvoiceItemLines invoiceItemLines = new SalesInvoiceItemLines();
+                                invoiceItemLines.ItemId = item.ItemId;
+                                invoiceItemLines.InvoiceId = salesInvoiceId;
+                                invoiceItemLines.ItemName = itemName;
+                                invoiceItemLines.LedgerName = ledgerName;
+                                invoiceItemLines.Qty = qty;
+                                invoiceItemLines.Rate = actualRate;
+                                invoiceItemLines.Amount = amount;
+                                invoiceItemLines.Discount = discount;
+                                invoiceItemLines.TaxRate = taxRate;
+                                invoiceItemLines.CompanyId = company.Guid;
+                                invoiceItemLines.IsDeleted = false;
+                                invoiceItemLines.HsnCode = hsn;
+
+                                uow.SalesInvoiceItemLines.Add(invoiceItemLines);
+
+                                _logger.Debug("ImportWorker|" + Session.UserName + "|Sales Invoice Item " + itemName + " for Sales Invoice - " + salesInvoiceNo + " added to database" + "^");
+                                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                                #endregion
+                            }
+
+                            bool containsInventoryAllocations = ledgerEntry.InnerXml.Contains("INVENTORYALLOCATIONS.LIST");
+                            if (partyLedgerName != ledgerName && containsInventoryAllocations == false)
+                            {
+                                string taxLedgerName = TallyUtil.ReadString(ledgerEntry, "LEDGERNAME");
+                                string taxType = TallyUtil.ReadString(ledgerEntry, "LEDGERTAXTYPE");
+                                decimal percentageRate = TallyUtil.ReadDecimal(ledgerEntry, "LEDGERTAXRATE");
+                                decimal amount = TallyUtil.ReadDecimal(ledgerEntry, "AMOUNT");
+
+                                TaxAndChargesLines taxAndChargesLines = new TaxAndChargesLines();
+                                taxAndChargesLines.SalesInvoiceId = salesInvoiceId;
+                                taxAndChargesLines.LedgerName = ledgerName;
+                                taxAndChargesLines.TaxType = taxType;
+                                taxAndChargesLines.PercentageRate = percentageRate;
+                                taxAndChargesLines.Amount = amount;
+                                taxAndChargesLines.CompanyId = company.Guid;
+                                taxAndChargesLines.IsDeleted = false;
+
+                                uow.TaxAndChargesLines.Add(taxAndChargesLines);
+
+                                _logger.Debug("ImportWorker|" + Session.UserName + "|Sales Invoice Taxes and Charges: Ledger" + ledgerName + " for Sales Invoice - " + salesInvoiceNo + " added to database" + "^");
+                                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                            }
+                        }
+                    }
+
+                    CheckDeletedInvoice(company, uow, startDate, endDate);
+                    SaveSyncStatusInDb(uow, syncStatusForSalesInvoice, SyncStatusCondition.SyncEnded);
+                }
+                _logger.Info("ImportWorker|" + Session.UserName + "|Sync completed for Sales Invoices" + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+            catch (Exception ex)
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                {
+                    if (ex.Message.Contains("SQL logic error"))
+                    {
+                        ErrorLogger.LogError(_logger, "Sales Invoice", "ImportWorker|" + Session.UserName + "|" + ex.Message + "56+5+65" + "^");
+                    }
+                    else
+                    {
+                        SyncStatus syncStatusForSalesInvoice = GetSyncStatusObject(uow, SyncStatusTextMessageHelper.SalesInvoices);
+                        SaveSyncStatusInDb(uow, syncStatusForSalesInvoice, SyncStatusCondition.TallyError);
+                        _salesInvoiceLogger.Info("ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                        _salesInvoiceLogger.Info("");
+                        throw;
+                    }
+                }
+            }
+        }
+
+        private void CheckDeletedInvoice(Company company, UnitOfWork uow, DateTime startDate, DateTime endDate)
+        {
+            try
+            {
+                TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+                List<string> guidList = new List<string>();
+
+                Session.IsTallyOpen = true;
+                if (!tallyConn.IsTallyOpen())
+                {
+                    ErrorLogger.LogError(_logger, "Sales Invoice", "ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                    throw new Exception("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                }
+
+                Session.TallyIsEducational = false;
+                if (tallyConn.IsTallyEducational())
+                {
+                    ErrorLogger.LogError(_logger, "Sales Invoice", "ImportWorker|" + Session.UserName + "|Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                    Session.TallyIsEducational = true;
+                    throw new Exception("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                }
+
+                Session.IsCompanyOpen = true;
+                if (!tallyConn.IsCompanyOpenInTally(company.CompanyName))
+                {
+                    ErrorLogger.LogError(_logger, "Sales Invoice", "ImportWorker|" + Session.UserName + "|Checking deleted Customers error - Company " + company.CompanyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort + "^");
+                    Session.IsCompanyOpen = false;
+                    throw new Exception("Company " + company.CompanyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort);
+                }
+
+                var invoiceList = uow.SalesInvoice.GetList().Where(x => x.CompanyId == company.Guid && x.OriginalInvoiceDate >= startDate && x.OriginalInvoiceDate <= endDate).ToList();
+                if (invoiceList.Count == 0)
+                {
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|No sales invoice found in database for Company: " + company.CompanyName + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|");
+                    return;
+                }
+
+                string xml = tallyConn.GetInvoice(company.CompanyName, Constants.VoucherFields, startDate, endDate, -1);
+
+                xml = tallyConn.CleanInvalidXmlChars(xml);
+
+                _httpLogger.Trace("Sales Invoice xml -\n" + xml);
+                _httpLogger.Trace("");
+
+                XmlDocument xmlDocument = new XmlDocument();
+                using (var sr = new StringReader(xml))
+                using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                    xmlDocument.Load(xtr);
+
+                XmlNodeList voucherNodes = xmlDocument.SelectNodes("//BODY//DATA//COLLECTION//VOUCHER");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|Received " + voucherNodes.Count + " invoices" + "^");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                foreach (XmlNode node in voucherNodes)
+                {
+                    string guid = TallyUtil.ReadString(node, "GUID");
+                    guidList.Add(guid);
+                }
+
+                foreach (SalesInvoice invoice in invoiceList)
+                {
+                    if (guidList.Contains(invoice.SalesInvoiceId))
+                        continue;
+                    else
+                    {
+                        invoice.IsDeleted = true;
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|Sales Invoice No. : " + invoice.SalesInvoiceNo + " is marked deleted as not found in tally for Company: " + company.CompanyName + "^");
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                        var invoiceLines = uow.SalesInvoiceItemLines.GetList().Where(x => x.InvoiceId == invoice.SalesInvoiceId).ToList();
+                        foreach (SalesInvoiceItemLines itemLines in invoiceLines)
+                        {
+                            itemLines.IsDeleted = true;
+                            uow.SalesInvoiceItemLines.Update(itemLines);
+                        }
+
+                        var taxesAndChargesLinesList = uow.TaxAndChargesLines.GetList().Where(x => x.SalesInvoiceId == invoice.SalesInvoiceId).ToList();
+                        foreach (TaxAndChargesLines taxAndCharges in taxesAndChargesLinesList)
+                        {
+                            taxAndCharges.IsDeleted = true;
+                            uow.TaxAndChargesLines.Update(taxAndCharges);
+                        }
+                        uow.SalesInvoice.Update(invoice);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("SQL logic error"))
+                {
+                    ErrorLogger.LogError(_logger, "Sales Invoice", "ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                }
+                else
+                    throw;
+            }
+        }
+
+        #endregion
+
+        #region Customer Outstanding
+        public void UpdateCustomerOutstanding(string companyName)
+        {
+            try
+            {
+                _errorCount = 0;
+                _logger.Info("ImportWorker|" + Session.UserName + "|Sync started for Customer Outstanding" + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                {
+                    Company company = uow.Company.GetList().Where(x => x.CompanyName == companyName).FirstOrDefault();
+                    TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+                    SyncStatus syncStatusForOutstanding = GetSyncStatusObject(uow, SyncStatusTextMessageHelper.Outstandings);
+                    SaveSyncStatusInDb(uow, syncStatusForOutstanding, SyncStatusCondition.SyncStarting);
+
+                    Session.IsTallyOpen = true;
+                    if (!tallyConn.IsTallyOpen())
+                    {
+                        ErrorLogger.LogError(_logger, "Customer Outstanding", "ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.IsTallyOpen = false;
+                        SaveSyncStatusInDb(uow, syncStatusForOutstanding, SyncStatusCondition.TallyError);
+                        _outstanindgsLogger.Info("ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        _outstanindgsLogger.Info("");
+                        throw new Exception("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                    }
+
+                    Session.TallyIsEducational = false;
+                    if (tallyConn.IsTallyEducational())
+                    {
+                        ErrorLogger.LogError(_logger, "Customer Outstanding", "ImportWorker|" + Session.UserName + "|Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.TallyIsEducational = true;
+                        SaveSyncStatusInDb(uow, syncStatusForOutstanding, SyncStatusCondition.TallyError);
+                        _outstanindgsLogger.Info("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        _outstanindgsLogger.Info("");
+                        throw new Exception("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                    }
+
+                    Session.IsCompanyOpen = true;
+                    if (!tallyConn.IsCompanyOpenInTally(companyName))
+                    {
+                        ErrorLogger.LogError(_logger, "Customer Outstanding", "ImportWorker|" + Session.UserName + "|Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort + "^");
+                        Session.IsCompanyOpen = false;
+                        SaveSyncStatusInDb(uow, syncStatusForOutstanding, SyncStatusCondition.TallyError);
+                        _outstanindgsLogger.Info("Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        _outstanindgsLogger.Info("");
+                        throw new Exception("Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort);
+                    }
+
+                    DateTime toDate = DateTime.Now;
+
+                    string xml = tallyConn.GetCustomerOutstanding(companyName, toDate);
+
+                    xml = tallyConn.CleanInvalidXmlChars(xml);
+
+                    _httpLogger.Trace("Customer Outstanding xml -\n" + xml);
+                    _httpLogger.Trace("");
+
+                    XmlDocument xmlDocument = new XmlDocument();
+                    using (var sr = new StringReader(xml))
+                    using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                        xmlDocument.Load(xtr);
+
+                    XmlNodeList customerOutstandingList = xmlDocument.SelectNodes("//BODY//DATA//COLLECTION//LEDGER");
+
+                    Guid companyId = company.Id;
+
+
+                    foreach (XmlNode node in customerOutstandingList)
+                    {
+
+                        string customerId = TallyUtil.ReadString(node, "LEDGERGUID");    //Subhabrata 23-Sep-2021 : Changed ledger master id to ledger Guid on client request
+                        DateTime timeStamp = DateTime.Now;
+                        decimal outstandingAmount = TallyUtil.ReadDecimal(node, "CLOSINGBALANCE");
+
+                        //Deleting all CustomerOutstanding before inserting
+                        //_logger.Info("Deleting Customer Outstandings before inserting.");
+                        //_logger.Info("");
+
+                        var outstandingtList = uow.CustomerOutstanding.GetList().Where(x => x.CompanyId == company.Guid && x.CustomerId == customerId);
+                        foreach (CustomerOutstanding outstanding in outstandingtList)
+                        {
+                            uow.CustomerOutstanding.Delete(outstanding.Id);
+                        }
+                        // _logger.Debug("Deletion of Customer Outstanding completed. Starting insertion.");
+                        //_logger.Debug("");
+
+                        CustomerOutstanding customerOutstanding = new CustomerOutstanding();
+                        customerOutstanding.Timestamp = timeStamp;
+                        customerOutstanding.CompanyId = company.Guid;
+                        customerOutstanding.CustomerId = customerId;
+                        customerOutstanding.OutstandingAmount = outstandingAmount;
+                        customerOutstanding.ImportedOn = DateTime.Now;
+                        customerOutstanding.IsPosted = false;
+                        customerOutstanding.RetryCount = 0;
+                        customerOutstanding.PostedOn = new DateTime(2000, 01, 01);
+                        customerOutstanding.PostingMessage = "";
+                        //customerOutstanding.PostedOn = DateTime.Now;
+
+                        uow.CustomerOutstanding.Add(customerOutstanding);
+
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|Customer Outstanding for Customer Id - " + customerId + " added to database" + "^");
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                    }
+                    SaveSyncStatusInDb(uow, syncStatusForOutstanding, SyncStatusCondition.SyncEnded);
+                }
+
+                _logger.Info("ImportWorker|" + Session.UserName + "|Sync completed for Customer Outstanding" + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+            catch (Exception ex)
+            {
+                //_logger.Fatal(ex);
+                //_logger.Fatal("");
+                if (ex.Message.Contains("SQL logic error"))
+                {
+                    ErrorLogger.LogError(_logger, "Customer Outstanding", "ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                }
+                else
+                    throw;
+            }
+        }
+
+        #endregion
+
+        #region Stock
+        public void UpdateStock(string companyName)
+        {
+            try
+            {
+                _errorCount = 0;
+                _logger.Info("ImportWorker|" + Session.UserName + "|Sync started for Stocks" + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                {
+                    Settings productFilter = uow.Settings.GetList().Where(x => x.Key == "PRODUCT_FILTER").FirstOrDefault();
+                    string[] productNames = null;
+                    if (!string.IsNullOrEmpty(productFilter.Value))
+                    {
+                        string pattern = @"[ ,;]+";
+                        productNames = Regex.Split(productFilter.Value, pattern);
+                    }
+                    Company company = uow.Company.GetList().Where(x => x.CompanyName == companyName).FirstOrDefault();
+                    TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+                    SyncStatus syncStatusForStock = GetSyncStatusObject(uow, SyncStatusTextMessageHelper.Stocks);
+                    SaveSyncStatusInDb(uow, syncStatusForStock, SyncStatusCondition.SyncStarting);
+
+                    Session.IsTallyOpen = true;
+                    if (!tallyConn.IsTallyOpen())
+                    {
+                        ErrorLogger.LogError(_logger, "Stock", "ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.IsTallyOpen = false;
+                        SaveSyncStatusInDb(uow, syncStatusForStock, SyncStatusCondition.TallyError);
+                        _stocksLogger.Info("ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        _stocksLogger.Info("");
+                        throw new Exception("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                    }
+
+                    Session.TallyIsEducational = false;
+                    if (tallyConn.IsTallyEducational())
+                    {
+                        ErrorLogger.LogError(_logger, "Stock", "ImportWorker|" + Session.UserName + "|Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.TallyIsEducational = true;
+                        SaveSyncStatusInDb(uow, syncStatusForStock, SyncStatusCondition.TallyError);
+                        _stocksLogger.Info("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        _stocksLogger.Info("");
+                        throw new Exception("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                    }
+
+                    Session.IsCompanyOpen = true;
+                    if (!tallyConn.IsCompanyOpenInTally(companyName))
+                    {
+                        ErrorLogger.LogError(_logger, "Stock", "ImportWorker|" + Session.UserName + "|Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort + "^");
+                        Session.IsCompanyOpen = false;
+                        SaveSyncStatusInDb(uow, syncStatusForStock, SyncStatusCondition.TallyError);
+                        _outstanindgsLogger.Info("Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        _outstanindgsLogger.Info("");
+                        throw new Exception("Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort);
+                    }
+                    DateTime currentDate = DateTime.Now;
+
+                    string stockItemXml = tallyConn.GetMasters(companyName, -1, "StockItem", "NAME, MASTERID");
+                    stockItemXml = TallyUtil.CleanInvalidXmlChars(stockItemXml);
+                    _httpLogger.Trace(stockItemXml);
+                    _httpLogger.Trace("");
+
+                    XmlDocument xmlDocument = new XmlDocument();
+                    using (var sr = new StringReader(stockItemXml))
+                    using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                        xmlDocument.Load(xtr);
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Loading stock xml" + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                    XmlNodeList itemNodes = xmlDocument.SelectNodes("//BODY//DATA//COLLECTION//STOCKITEM");
+
+                    int stockCount = 0;
+                    foreach (XmlNode item in itemNodes)
+                    {
+                        string stockItemName = TallyUtil.ReadAttribute(item, "NAME");
+                        int masterId = TallyUtil.ReadInt(item, "MASTERID");
+
+                        if (!string.IsNullOrEmpty(stockItemName))
+                        {
+                            if (productNames != null)
+                            {
+                                if (!IsProductNameMatched(stockItemName, productNames))
+                                    continue;
+                            }
+
+                            string xml = tallyConn.GetStock(companyName, currentDate, currentDate, masterId);
+
+                            xml = tallyConn.CleanInvalidXmlChars(xml);
+
+                            _httpLogger.Trace("Stock xml -\n" + xml);
+                            _httpLogger.Trace("");
+
+                            XmlDocument stockXmlDocument = new XmlDocument();
+                            using (var sr = new StringReader(xml))
+                            using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                                stockXmlDocument.Load(xtr);
+
+                            XmlNodeList stockNodes = stockXmlDocument.SelectNodes("//BODY//DATA//COLLECTION//BATCH");
+
+                            _logger.Debug("ImportWorker|" + Session.UserName + "|Received " + stockNodes.Count + " stocks from Tally for Item - " + stockItemName + "^");
+                            _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                            decimal outstandingQty = 0;
+                            decimal outstandingAmount = 0;
+                            string itemId = string.Empty;
+                            string godown = string.Empty;
+
+                            foreach (XmlNode node in stockNodes)
+                            {
+                                string batchName = TallyUtil.ReadString(node, "NAME");
+                                TallyQuantity tallyQty = TallyUtil.ReadQty(node, "CLOSINGBALANCE");
+                                decimal qty = tallyQty.Quantity;
+                                TallyAmount tallyAmount = TallyUtil.ReadAmount(node, "CLOSINGVALUE");
+                                decimal amount = tallyAmount.BaseCurrencyAmount;
+                                godown = TallyUtil.ReadString(node, "GODOWNNAME");
+
+                                Items itemExists = uow.Items.GetList().Where(x => x.ItemName == stockItemName && x.MasterId == masterId && x.CompanyId == company.Guid).FirstOrDefault();
+                                if (itemExists == null)
+                                    continue;
+
+                                itemId = itemExists.ItemId;
+
+                                //Deleting before stocks inserting
+                                //_logger.Debug("Deleting Stocks for Item: " + itemExists.ItemName + " as on date: " + currentDate + " before inserting.");
+                                // _logger.Debug("");
+                                var stocksList = uow.Stock.GetList().Where(x => x.CompanyId == company.Guid && x.ItemId == itemExists.ItemId && x.Godown == godown);
+                                foreach (Stock dbStock in stocksList)
+                                {
+                                    uow.Stock.Delete(dbStock.Id);
+                                }
+                                //_logger.Debug("Deletion of Stocks completed. Starting insertion.");
+                                // _logger.Debug("");
+
+                                outstandingQty += qty;
+                                outstandingAmount += amount;
+                            }
+                            if (!string.IsNullOrEmpty(itemId))
+                            {
+                                Stock stock = new Stock();
+                                stock.Amount = outstandingAmount;
+                                stock.CompanyId = company.Guid;
+                                stock.Godown = godown;
+                                stock.ItemId = itemId;
+                                stock.Qty = outstandingQty;
+                                stock.Timestamp = currentDate;
+                                stock.ImportedOn = DateTime.Now;
+                                stock.IsDeleted = false;
+                                stock.PostedOn = new DateTime(2000, 1, 1);
+                                stock.IsPosted = false;
+                                stock.PostingMessage = string.Empty;
+
+                                uow.Stock.Add(stock);
+
+                                stockCount++;
+                                _logger.Debug("ImportWorker|" + Session.UserName + "|Stock for Item - " + stockItemName + " added to database" + "^");
+                                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                            }
+                        }
+                    }
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Recieved " + stockCount + " stocks from Tally" + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                    CheckDeletedStocks(company, uow, productNames);
+                    SaveSyncStatusInDb(uow, syncStatusForStock, SyncStatusCondition.SyncEnded);
+                }
+                _logger.Info("ImportWorker|" + Session.UserName + "|Sync completed for Stocks" + "^");
+                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("SQL logic error"))
+                {
+                    ErrorLogger.LogError(_logger, "Stocks", "ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                }
+                else
+                    throw;
+            }
+        }
+
+        private void CheckDeletedStocks(Company company, UnitOfWork uow, string[] productNames)
+        {
+            try
+            {
+                TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+
+                Session.IsTallyOpen = true;
+                if (!tallyConn.IsTallyOpen())
+                {
+                    ErrorLogger.LogError(_logger, "Stocks", "ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                    Session.IsTallyOpen = false;
+                    throw new Exception("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                }
+
+                Session.TallyIsEducational = false;
+                if (tallyConn.IsTallyEducational())
+                {
+                    ErrorLogger.LogError(_logger, "Stocks", "ImportWorker|" + Session.UserName + "|Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                    Session.TallyIsEducational = true;
+                    throw new Exception("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                }
+
+                Session.IsCompanyOpen = true;
+                if (!tallyConn.IsCompanyOpenInTally(company.CompanyName))
+                {
+                    ErrorLogger.LogError(_logger, "Stocks", "ImportWorker|" + Session.UserName + "|Checking deleted Stocks error - Company " + company.CompanyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort + "^");
+                    Session.IsCompanyOpen = false;
+                    throw new Exception("Company " + company.CompanyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort);
+                }
+
+                DateTime currentDate = DateTime.Now;
+
+                var stocksList = uow.Stock.GetList().Where(x => x.CompanyId == company.Guid).ToList();
+                if (stocksList.Count == 0)
+                {
+                    ErrorLogger.LogError(_logger, "Stocks", "ImportWorker|" + Session.UserName + "|No stocks found in database for Company: " + company.CompanyName + "^");
+                    return;
+                }
+
+                string itemXml = tallyConn.GetMasters(company.CompanyName, 0, "Stock Item", Constants.ItemsFields);
+
+                itemXml = tallyConn.CleanInvalidXmlChars(itemXml);
+
+                _httpLogger.Trace("Item xml -\n" + itemXml);
+                _httpLogger.Trace("");
+
+                XmlDocument xmlDocument = new XmlDocument();
+                using (var sr = new StringReader(itemXml))
+                using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                    xmlDocument.Load(xtr);
+
+                XmlNodeList itemNodes = xmlDocument.SelectNodes("//BODY//DATA//COLLECTION//STOCKITEM");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|Received " + itemNodes.Count + " items from Tally" + "^");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                foreach (XmlNode item in itemNodes)
+                {
+                    string stockItemName = TallyUtil.ReadAttribute(item, "NAME");
+                    int masterId = TallyUtil.ReadInt(item, "MASTERID");
+
+                    if (!string.IsNullOrEmpty(stockItemName))
+                    {
+                        if (productNames != null)
+                        {
+                            if (!IsProductNameMatched(stockItemName, productNames))
+                                continue;
+                        }
+
+                        string xml = tallyConn.GetStock(company.CompanyName, currentDate, currentDate, masterId);
+
+                        xml = tallyConn.CleanInvalidXmlChars(xml);
+
+                        _httpLogger.Trace("Stock xml -\n" + xml);
+                        _httpLogger.Trace("");
+
+                        XmlDocument stockXmlDocument = new XmlDocument();
+                        using (var sr = new StringReader(xml))
+                        using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                            stockXmlDocument.Load(xtr);
+
+                        XmlNodeList stockNodes = stockXmlDocument.SelectNodes("//BODY//DATA//COLLECTION//BATCH");
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|Received " + stockNodes.Count + " stocks from Tally" + "^");
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                        Items itemExists = uow.Items.GetList().Where(x => x.ItemName == stockItemName && x.MasterId == masterId && x.CompanyId == company.Guid).FirstOrDefault();
+
+                        if (stockNodes.Count == 0)
+                        {
+                            List<Stock> stockDeletionList = uow.Stock.GetList().Where(x => x.ItemId == itemExists.ItemId && x.CompanyId == itemExists.CompanyId).ToList();
+
+                            foreach (var stock in stockDeletionList)
+                            {
+                                stock.IsDeleted = true;
+                                _logger.Debug("ImportWorker|" + Session.UserName + "|Stock for Item Name : " + stockItemName + " is marked deleted as not found in tally for Company: " + company.CompanyName + "^");
+                                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                                uow.Stock.Update(stock);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("SQL logic error"))
+                {
+                    ErrorLogger.LogError(_logger, "Stocks", "ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                }
+                else
+                    throw;
+            }
+        }
+
+        #endregion
+
+        #region Receipt
+        public void UpdateReceipt(List<CustomerPayment> customerList)
+        {
+            try
+            {
+                if (customerList == null)
+                {
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|No Receipt entries found for Customer Payment Confirmation" + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                    return;
+                }
+
+                _logger.Debug("ImportWorker|" + Session.UserName + "|Syncing Receipt entries started for Customer Payment Confirmation" + "^");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                foreach (CustomerPayment customer in customerList)
+                {
+                    using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                    {
+                        Company company = uow.Company.GetList().Where(x => x.Guid == customer.CompanyId).FirstOrDefault();
+
+                        TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+
+                        Session.IsTallyOpen = true;
+                        if (!tallyConn.IsTallyOpen())
+                        {
+                            ErrorLogger.LogError(_logger, "Receipt", "ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                            Session.IsTallyOpen = false;
+                            throw new Exception("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                        }
+
+                        Session.TallyIsEducational = false;
+                        if (tallyConn.IsTallyEducational())
+                        {
+                            ErrorLogger.LogError(_logger, "Receipt", "ImportWorker|" + Session.UserName + "|Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                            Session.TallyIsEducational = true;
+                            throw new Exception("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                        }
+
+                        Session.IsCompanyOpen = true;
+                        if (!tallyConn.IsCompanyOpenInTally(company.CompanyName))
+                        {
+                            ErrorLogger.LogError(_logger, "Receipt", "ImportWorker|" + Session.UserName + "|Company " + company.CompanyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort + "^");
+                            Session.IsCompanyOpen = false;
+                            throw new Exception("Company " + company.CompanyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort);
+                        }
+
+                        string xml = tallyConn.GetReceipts(company.CompanyName, customer.ImportedOn, customer.ImportedOn, Constants.ReceiptFields);
+
+                        xml = tallyConn.CleanInvalidXmlChars(xml);
+
+                        _httpLogger.Trace("Receipt xml -\n" + xml);
+                        _httpLogger.Trace("");
+
+                        XmlDocument xmlDocument = new XmlDocument();
+                        using (var sr = new StringReader(xml))
+                        using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                            xmlDocument.Load(xtr);
+
+                        XmlNodeList voucherNodes = xmlDocument.SelectNodes("//BODY//DATA//COLLECTION//VOUCHER");
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|Received " + voucherNodes.Count + " receipt invoices from Tally" + "^");
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                        foreach (XmlNode node in voucherNodes)
+                        {
+                            DateTime voucherDate = TallyUtil.ReadDate(node, "DATE", "YYYYMMDD");
+                            string voucherNo = TallyUtil.ReadString(node, "VOUCHERNUMBER");
+                            bool isOptional = TallyUtil.ReadBool(node, "ISOPTIONAL");
+
+                            // _logger.Debug("Deleting confirmation list before inserting");
+                            // _logger.Debug("");
+                            var customerPaymentConfirmList = uow.CustomerPaymentPostingConfirmation.GetList().Where(x => x.CompanyId == customer.CompanyId && x.CustomerId == customer.CustomerId && x.VoucherDate == voucherDate && x.VoucherNo == voucherNo).ToList();
+                            foreach (CustomerPaymentPostingConfirmation confirmation in customerPaymentConfirmList)
+                            {
+                                uow.CustomerPaymentPostingConfirmation.Delete(confirmation.Id);
+                            }
+                            //_logger.Debug("Deletion of confirmation list completed. Begin insertion...");
+                            //_logger.Debug("");
+
+
+                            CustomerPaymentPostingConfirmation customerPayment = new CustomerPaymentPostingConfirmation();
+                            customerPayment.CompanyId = customer.CompanyId;
+                            customerPayment.BeatroutePaymentId = customer.PaymentId;
+                            customerPayment.CustomerId = customer.CustomerId;
+                            customerPayment.CustomerName = customer.CustomerName;
+                            customerPayment.ImportedOn = DateTime.Now;
+                            customerPayment.IsOptional = isOptional;
+                            customerPayment.IsPosted = false;
+                            customerPayment.IsSuccess = isOptional == true ? false : true;
+                            customerPayment.Message = customer.PostingMessage;
+                            customerPayment.PostedOn = new DateTime(2000, 01, 01);
+                            customerPayment.PostingMessage = "";
+                            customerPayment.VoucherDate = voucherDate;
+                            customerPayment.VoucherNo = voucherNo;
+                            customerPayment.RetryCount = customerPayment.RetryCount + 1;
+
+                            uow.CustomerPaymentPostingConfirmation.Add(customerPayment);
+
+                            _logger.Debug("ImportWorker|" + Session.UserName + "|Customer Payment entry added for Customer: " + customer.CustomerName + ", Company : " + company.CompanyName + "^");
+                            _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                        }
+
+                    }
+                }
+                _logger.Debug("ImportWorker|" + Session.UserName + "|Syncing Receipt entries completed for Customer Payment Confirmation" + "^");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("SQL logic error"))
+                {
+                    ErrorLogger.LogError(_logger, "Receipt", "ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                }
+                else
+                    throw;
+            }
+        }
+
+        #endregion
+
+        #region SalesOrderStatus
+        public void UpdateSalesOrderStatus(string companyName)
+        {
+            try
+            {
+                DateTime startDate = DateTime.Now.AddDays(-90);
+                DateTime endDate = DateTime.Now;
+
+                _logger.Debug("ImportWorker|" + Session.UserName + "|Sync started for SalesOrderStatus" + "^");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                {
+                    #region Company Declaration and OrderStatus List Diclatration
+                    Company company = uow.Company.GetList().Where(x => x.CompanyName == companyName).FirstOrDefault();
+                    List<OrderStatus> orderStatusList = uow.OrderStatus.GetList().Where(x => x.CompanyId == company.Guid).ToList();
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Status count in database table - " + orderStatusList.Count() + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                    int maxAlterId = -1;
+                    if (orderStatusList.Count > 0)
+                        maxAlterId = orderStatusList.Max<OrderStatus>(x => x.AlterId);
+                    #endregion
+
+                    TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+
+                    #region Basic Tally checking
+                    Session.IsTallyOpen = true;
+                    if (!tallyConn.IsTallyOpen())
+                    {
+                        ErrorLogger.LogError(_logger, "Order Status", "ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.IsTallyOpen = false;
+                        throw new Exception("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                    }
+
+                    Session.TallyIsEducational = false;
+                    if (tallyConn.IsTallyEducational())
+                    {
+                        ErrorLogger.LogError(_logger, "Order Status", "ImportWorker|" + Session.UserName + "|Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.TallyIsEducational = true;
+                        throw new Exception("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                    }
+
+                    Session.IsCompanyOpen = true;
+                    if (!tallyConn.IsCompanyOpenInTally(companyName))
+                    {
+                        ErrorLogger.LogError(_logger, "Order Status", "ImportWorker|" + Session.UserName + "|Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort + "^");
+                        Session.IsCompanyOpen = false;
+                        throw new Exception("Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort);
+                    }
+                    #endregion
+
+                    #region Reading XML
+                    string xml = tallyConn.GetOrderStatus(companyName, Constants.OrderFields, startDate, endDate, maxAlterId);
+                    xml = tallyConn.CleanInvalidXmlChars(xml);
+
+                    _httpLogger.Trace("Order Status xml -\n" + xml);
+                    _httpLogger.Trace("");
+
+                    XmlDocument xmlDocument = new XmlDocument();
+                    using (var sr = new StringReader(xml))
+                    using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                        xmlDocument.Load(xtr);
+
+                    XmlNodeList orderNodeList = xmlDocument.SelectNodes("//BODY//DATA//COLLECTION//VOUCHER");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Received " + orderNodeList.Count + " Orders from Tally" + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                    #endregion
+
+                    #region Complete Foreach loop for reading and storing the Data for create the Order Status
+                    foreach (XmlNode node in orderNodeList)
+                    {
+                        #region Reading the Values from Tally
+                        int alterId = TallyUtil.ReadInt(node, "ALTERID");
+                        string voucherGuid = TallyUtil.ReadString(node, "GUID");
+                        string orderId = TallyUtil.ReadString(node, "REFERENCE");
+                        string beatrouteOrderId = TallyUtil.ReadString(node, "REFERENCE");
+                        bool isCancelled = TallyUtil.ReadBool(node, "ISCANCELLED");
+                        bool isDeleted = TallyUtil.ReadBool(node, "ISDELETED");
+                        #endregion
+
+                        CustomerOrder customerOrder = uow.CustomerOrder.GetList().Where(x => x.CompanyId == company.Guid && x.OrderId == orderId).FirstOrDefault();
+
+                        if (customerOrder != null)
+                        {
+                            if (customerOrder.OrderId != null)
+                            {
+                                OrderStatus orderStatus = uow.OrderStatus.GetList().Where(x => x.CompanyId == company.Guid && x.OrderId == orderId).FirstOrDefault();
+                                #region Creating new Order Status in Database
+                                if (orderStatus == null)
+                                {
+                                    orderStatus = new OrderStatus();
+                                    orderStatus.AlterId = alterId;
+                                    orderStatus.VoucherGuid = voucherGuid;
+                                    orderStatus.OrderId = orderId;
+                                    orderStatus.BeatrouteOrderId = beatrouteOrderId;
+                                    orderStatus.CompanyId = company.Guid;
+                                    orderStatus.IsPosted = false;
+                                    orderStatus.IsDeleted = isDeleted;
+                                    orderStatus.PostedOn = new DateTime();
+                                    orderStatus.IsModified = true;
+                                    orderStatus.IsCancelled = isCancelled;
+                                    orderStatus.PostingMessage = "";
+                                    orderStatus.RetryCount = 0;
+
+                                    uow.OrderStatus.Add(orderStatus);
+                                }
+                                #endregion
+
+                                #region Updating the Order Status in Database
+                                else if (alterId != orderStatus.AlterId)
+                                {
+                                    orderStatus.AlterId = alterId;
+                                    orderStatus.VoucherGuid = voucherGuid;
+                                    orderStatus.OrderId = orderId;
+                                    orderStatus.BeatrouteOrderId = beatrouteOrderId;
+                                    orderStatus.CompanyId = company.Guid;
+                                    orderStatus.IsPosted = false;
+                                    orderStatus.IsDeleted = isDeleted;
+                                    orderStatus.PostedOn = new DateTime();
+                                    orderStatus.IsModified = true;
+                                    orderStatus.IsCancelled = isCancelled;
+                                    orderStatus.PostingMessage = "";
+                                    orderStatus.RetryCount = 0;
+
+                                    uow.OrderStatus.Update(orderStatus);
+
+                                    IEnumerable<OrderStatusLine> orderStatusLines = uow.OrderStatusLine.GetList().Where(x => x.OrderStatusId == orderStatus.OrderId);
+                                    foreach (OrderStatusLine line in orderStatusLines)
+                                        uow.OrderStatusLine.Delete(line.Id);
+                                }
+                                #endregion
+
+                                #region Saving the Order status Line
+                                XmlNodeList allInventoryAllocationList = node.SelectNodes("ALLINVENTORYENTRIES.LIST");
+                                foreach (XmlNode allInventory in allInventoryAllocationList)
+                                {
+                                    string itemName = TallyUtil.ReadString(allInventory, "STOCKITEMNAME");
+                                    TallyQuantity actualQuantity = TallyUtil.ReadQty(allInventory, "ACTUALQTY");
+                                    decimal qty = actualQuantity.Quantity;
+                                    string unitOfMeasure = actualQuantity.UOM;
+                                    DateTime CloseDate = new DateTime(2000, 01, 01);
+
+                                    XmlNodeList batchAllocations = allInventory.SelectNodes("./BATCHALLOCATIONS.LIST");
+                                    foreach (XmlNode batch in batchAllocations)
+                                    {
+                                        OrderStatusLine orderStatusLine = new OrderStatusLine();
+
+                                        Items item = uow.Items.GetList().Where(x => x.CompanyId == company.Guid && x.ItemName == itemName).FirstOrDefault();
+                                        if (item == null)
+                                            continue;
+
+                                        orderStatusLine.ItemName = itemName;
+                                        orderStatusLine.OrderStatusId = orderId;
+                                        orderStatusLine.Qty = qty;
+                                        orderStatusLine.UnitOfMeasure = unitOfMeasure;
+                                        orderStatusLine.ShortCloseDate = CloseDate;
+
+                                        if (!string.IsNullOrEmpty(TallyUtil.ReadString(batch, "ORDERPRECLOSUREDATE")))
+                                        {
+                                            string shortCloseDate = TallyUtil.ReadString(batch, "ORDERPRECLOSUREDATE");
+                                            CloseDate = new DateTime(int.Parse(shortCloseDate.Substring(0, 4)), int.Parse(shortCloseDate.Substring(4, 2)),
+                                            int.Parse(shortCloseDate.Substring(6, 2)));
+                                        }
+                                        string shortCloseReason = TallyUtil.ReadString(batch, "ORDERCLOSUREREASON ");
+                                        TallyQuantity shortQuantity = TallyUtil.ReadQty(batch, "ORDERPRECLOSUREQTY");
+                                        decimal shortCloseQty = shortQuantity.Quantity;
+
+                                        orderStatusLine.ShortCloseQty = shortCloseQty;
+                                        orderStatusLine.ShortCloseReason = shortCloseReason;
+                                        uow.OrderStatusLine.Add(orderStatusLine);
+                                    }
+                                }
+                                #endregion
+                            }
+                            else
+                            {
+                                _logger.Debug("ImportWorker|" + Session.UserName + "|Order Status cannot proceed. No Order found in Database" + "^");
+                            }
+                        }
+                        else
+                            _logger.Debug("ImportWorker|" + Session.UserName + "|Order Status cannot proceed, because there is no Customer Order" + "^");
+
+                    }
+                    #endregion
+                }
+            }
+            catch (Exception ex)
+            {
+
+                if (ex.Message.Contains("SQL logic error"))
+                {
+                    ErrorLogger.LogError(_logger, "Order Status", "ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                }
+                else
+                    throw;
+            }
+
+
+
+        }
+
+        #endregion
+
+        #region Sales Order Deletion Checking 
+        public void UpdateDeletedSalesOrders(string companyName)
+        {
+            try
+            {
+                DateTime startDate = DateTime.Now.AddDays(-30).Date;
+                DateTime endDate = DateTime.Now.Date;
+
+                _logger.Debug("ImportWorker|" + Session.UserName + "|Sync started for SalesOrderStatus" + "^");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                {
+                    Company company = uow.Company.GetList().Where(x => x.CompanyName == companyName).FirstOrDefault();
+                    List<CustomerOrder> customerOrderList = uow.CustomerOrder
+                        .GetList()
+                        .Where(x =>
+                                x.CompanyId == company.Guid &&
+                                x.OrderDate >= startDate &&
+                                x.IsPosted == true)
+                        .ToList();
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Order count in database table - " + customerOrderList.Count() + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                    TallyConnector tallyConn = new TallyConnector(Session.TallyIp, Session.TallyPort);
+
+                    #region Base tally checks
+
+                    Session.IsTallyOpen = true;
+                    if (!tallyConn.IsTallyOpen())
+                    {
+                        ErrorLogger.LogError(_logger, "Order Status", "ImportWorker|" + Session.UserName + "|Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.IsTallyOpen = false;
+                        throw new Exception("Tally is not open for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                    }
+
+                    Session.TallyIsEducational = false;
+                    if (tallyConn.IsTallyEducational())
+                    {
+                        ErrorLogger.LogError(_logger, "Order Status", "ImportWorker|" + Session.UserName + "|Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort + "^");
+                        Session.TallyIsEducational = true;
+                        throw new Exception("Tally is running in education mode for IP - " + Session.TallyIp + ", PORT - " + Session.TallyPort);
+                    }
+
+                    Session.IsCompanyOpen = true;
+                    if (!tallyConn.IsCompanyOpenInTally(companyName))
+                    {
+                        ErrorLogger.LogError(_logger, "Order Status", "ImportWorker|" + Session.UserName + "|Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort + "^");
+                        Session.IsCompanyOpen = false;
+                        throw new Exception("Company " + companyName + " is not open in tally for IP - " + Session.TallyIp + " and PORT - " + Session.TallyPort);
+                    }
+                    #endregion
+
+                    //Get count of orders in Tally for the same date range - start date to end date
+                    string voucherStatsXml = tallyConn.GetVoucherStatistics(companyName, startDate, endDate, "Sales Order");
+
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Getting Sales Order Voucher Statitcs" + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                    if (voucherStatsXml == "<ERROR>Unable to connect to the remote server</ERROR>")
+                    {
+                        _logger.Error("ImportWorker|" + Session.UserName + "|Sync deletion for transactions is stopping due to Tally connectivity error" + "^");
+                        _logger.Error("");
+                        ErrorLogger.LogError(_logger, "Sales Order", "ImportWorker|" + Session.UserName + "|Sync deletion for transactions is stopping due to Tally connectivity error" + "^");
+                        return;
+                    }
+                    //Read Xml
+                    voucherStatsXml = tallyConn.CleanInvalidXmlChars(voucherStatsXml);
+
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Reading Sales Order Voucher Statitcs" + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                    _httpLogger.Trace("Order Status xml -\n" + voucherStatsXml);
+                    _httpLogger.Trace("");
+
+                    XmlDocument voucherStatXmlDocument = new XmlDocument();
+                    using (var sr = new StringReader(voucherStatsXml))
+                    using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                        voucherStatXmlDocument.Load(xtr);
+
+                    XmlNodeList salesOrderNodeList = voucherStatXmlDocument.SelectNodes("//BODY//DATA//COLLECTION//VOUCHERTYPE");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Received " + salesOrderNodeList.Count + " Orders from Tally" + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                    if (salesOrderNodeList.Count != 1)
+                    {
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|Order XML list count cannot be greater than 1" + "^");
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                        return;
+                    }
+                    XmlNode orderNode = salesOrderNodeList[0];
+                    int tallySalesOrderCount = TallyUtil.ReadInt(orderNode, "STATVAL");
+
+                    //Compare the count of orders in Tally with the count of orders in db
+                    if (customerOrderList.Count == tallySalesOrderCount)
+                    {
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|Order List in Database and Order List from are matched" + "^");
+                        _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+                        return;
+                    }
+                    //If the count matches then end the function
+                    //Since the count is not matched fetch the records for each date and match with Db
+                    //If a order exists in db but does not exist in Tally add a OrderStatus that the order is deleted
+                    //IMPORTANT: Do not change anything in the CustomerOrder table
+                    for (int i = 0; i < endDate.Subtract(startDate).TotalDays + 1; i++)
+                    {
+                        DateTime currentDate = startDate.AddDays(i);
+                        int maxAlterId = -1;
+                        //Get transaction list for current date
+                        string xml = tallyConn.GetOrderStatus(companyName, Constants.OrderFields, currentDate, currentDate, maxAlterId);
+                        xml = tallyConn.CleanInvalidXmlChars(xml);
+
+                        if (xml.Contains("<ERROR>") || xml.ToLower().Contains("unknown request"))
+                        {
+                            _logger.Error("ImportWorker|" + Session.UserName + "|Response from Tally" + "^");
+                            _logger.Error("ImportWorker|" + Session.UserName + "|" + "^");
+                            _logger.Error("ImportWorker|" + Session.UserName + "|" + xml + "^");
+                            _logger.Error("ImportWorker|" + Session.UserName + "|" + "^");
+                            ErrorLogger.LogError(_logger, "Sales Order", "ImportWorker|" + Session.UserName + "|ERROR in connecting with Tally to retrieve Sales Order list" + "^");
+                            return;
+                        }
+                        _httpLogger.Trace("Order Status xml -\n" + xml);
+                        _httpLogger.Trace("");
+
+                        XmlDocument xmlDocument = new XmlDocument();
+                        using (var sr = new StringReader(xml))
+                        using (var xtr = new XmlTextReader(sr) { Namespaces = false })
+                            xmlDocument.Load(xtr);
+
+                        XmlNodeList orderNodeList = xmlDocument.SelectNodes("//BODY//DATA//COLLECTION//VOUCHER");
+                        _logger.Info("ImportWorker|" + Session.UserName + "|Received " + orderNodeList.Count + " Orders from Tally" + "^");
+                        _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                        if (currentDate.Date == new DateTime(2021, 11, 15))
+                            _logger.Trace("15 Nov");
+
+                        List<CustomerOrder> dbOrderListForCurrentDate = uow.CustomerOrder.GetList().Where(x => x.CompanyId == company.Guid && x.OrderDate.Date == currentDate.Date && x.IsPosted == true).ToList();
+                        var tallyOrderIdList = orderNodeList.Cast<XmlElement>().Select(x => x.SelectSingleNode("REMOTEGUID").InnerText.Trim()).ToList();
+                        foreach (var customerOrder in dbOrderListForCurrentDate)
+                        {
+                            if (tallyOrderIdList.Contains("Sales Order-" + customerOrder.OrderId))
+                                continue;
+
+                            //Create deleted order status and save
+                            OrderStatus existingOrderStatus = uow.OrderStatus.GetList().Where(x => x.IsDeleted == true && x.OrderId == customerOrder.OrderId).FirstOrDefault();
+                            if (existingOrderStatus == null)
+                            {
+                                OrderStatus orderStatus = new OrderStatus()
+                                {
+                                    OrderId = customerOrder.OrderId,
+                                    BeatrouteOrderId = customerOrder.BeatrouteOrderId,
+                                    AlterId = -1,
+                                    CompanyId = customerOrder.CompanyId,
+                                    IsCancelled = false,
+                                    IsDeleted = true,
+                                    IsModified = false,
+                                    IsPosted = false,
+                                    PostedOn = DateTime.Now,
+                                    PostingMessage = "",
+                                    RetryCount = 0,
+                                    VoucherGuid = null
+                                };
+                                uow.OrderStatus.Add(orderStatus);
+                            }
+                        }
+
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("SQL logic error"))
+                {
+                    ErrorLogger.LogError(_logger, "Receipt", "ImportWorker|" + Session.UserName + "|" + ex.Message + "^");
+                }
+                else
+                    throw;
+            }
+        }
+        #endregion
+
+        #region Helper Method
+        private bool IsProductNameMatched(string stockItemName, string[] productNames)
+        {
+            foreach (string item in productNames)
+            {
+                if (stockItemName.Contains(item))
+                    return true;
+            }
+            return false;
+        }
+
+        private SyncStatus GetSyncStatusObject(UnitOfWork uow, string ledgerKey)
+        {
+            var syncStatusObject = uow.SyncStatus.GetList().Where(x => x.LedgerKey == ledgerKey).FirstOrDefault();
+            return syncStatusObject;
+        }
+
+        private void SaveSyncStatusInDb(UnitOfWork uow, SyncStatus syncStatus, SyncStatusCondition syncStatusCondition)
+        {
+            switch (syncStatusCondition)
+            {
+                case SyncStatusCondition.SyncStarting:
+                    if (syncStatus != null)
+                    {
+                        syncStatus.LedgerValue = SyncStatusTextMessageHelper.TallyDataSyncProgress;
+                        syncStatus.LedgerErrorStatus = "";
+                        uow.SyncStatus.Update(syncStatus);
+                    }
+                    break;
+                case SyncStatusCondition.TallyError:
+                    if (syncStatus != null)
+                    {
+                        _errorCount++;
+                        syncStatus.LedgerValue = SyncStatusTextMessageHelper.TallyDataSyncWithError;
+                        if (_errorCount > 1)
+                        {
+                            syncStatus.LedgerErrorStatus = _errorCount + SyncStatusTextMessageHelper.PluralErrorText;
+                        }
+                        else
+                            syncStatus.LedgerErrorStatus = _errorCount + SyncStatusTextMessageHelper.SingularErrorText;
+
+                        uow.SyncStatus.Update(syncStatus);
+                    }
+                    break;
+                case SyncStatusCondition.SyncEnded:
+                    if (syncStatus != null)
+                    {
+                        syncStatus.LedgerValue = SyncStatusTextMessageHelper.TallyDataSyncWithoutError;
+                        syncStatus.LedgerErrorStatus = "";
+                        uow.SyncStatus.Update(syncStatus);
+                    }
+                    break;
+                default:
+                    break;
+
+            }
+        }
+
+        #endregion
+
+        #region Enums
+
+        private enum SyncStatusCondition
+        {
+            SyncStarting,
+            SyncEnded,
+            TallyError
+        }
+
+        #endregion
+    }
+}

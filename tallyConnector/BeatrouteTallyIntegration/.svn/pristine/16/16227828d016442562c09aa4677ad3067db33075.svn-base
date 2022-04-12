@@ -1,0 +1,178 @@
+﻿using BeatrouteTallyIntegration.Utils;
+using BeatrouteTallyIntegrationBase.API;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Configuration;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using static BeatrouteTallyIntegrationBase.Utils.Enum;
+
+namespace BeatrouteTallyIntegration.Forms
+{
+    public partial class frmLogin : Form
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+        public const string GET_TOKEN_URL = "";
+        bool _login = false;
+        public frmLogin()
+        {
+            InitializeComponent();
+        }
+        public frmLogin(bool login)
+        {
+            InitializeComponent();
+
+            _login = login;
+        }
+
+        private Guid _loginUserId;
+        public string _userName;
+        private void btnSave_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                this.Cursor = Cursors.WaitCursor;
+                if (!ValidEntry())
+                    return;
+
+                //Session.BaseUrl = txtBaseUrl.Text;
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    //bool login = RestUtility.GetToken(txtUsername.Text, txtPassword.Text, GET_TOKEN_URL);
+                    bool login = RestUtility.GetToken(txtUsername.Text, txtPassword.Text, Session.BaseUrl + ApiType.login.ToString());
+                    if (!login)
+                    {
+                        //MessagePopup.ShowError("The remote server returned an error: (400) Bad Request.");
+                        MessagePopup.ShowError("Login failed.\n Please check the user credentials and try again or check log for details");
+                        return;
+                    }
+
+                    if (_loginUserId != Guid.Empty)
+                        uow.Login.Delete(_loginUserId);
+
+                    Login user = new Login();
+                    user.UserName = txtUsername.Text;
+                    user.Password = StringFunctions.Encrypt(txtPassword.Text);
+                    user.Device = "tally";
+                    user.Token = Session.Token;
+
+                    uow.Login.Add(user);
+
+                    _userName = txtUsername.Text;
+                    Session.UserName = _userName;
+
+                    //MessagePopup.ShowMessage("Login successful");
+                    this.DialogResult = DialogResult.OK;
+                    this.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+                MessagePopup.ShowError("Login failed\r\n:" + ex.Message);
+            }
+            finally
+            {
+                this.Cursor = Cursors.Default;
+            }
+        }
+
+        private void btnCancel_Click(object sender, EventArgs e)
+        {
+            DialogResult dr = MessageBox.Show("Do you want to cancel?", "Question", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (dr == DialogResult.Yes)
+            {
+                this.DialogResult = DialogResult.Abort;
+                this.Close();
+            }
+        }
+
+        private void frmLogin_Load(object sender, EventArgs e)
+        {
+            using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+            {
+                //txtBaseUrl.Text = ConfigurationManager.AppSettings["BaseUrl"].ToString();
+                //txtBaseUrl.Text = Session.GetBaseUrl();
+                //Session.BaseUrl = txtBaseUrl.Text;
+                linkLblForgotPassword.LinkVisited = false;
+                if (!_login)
+                {
+                    Login loginUser = uow.Login.GetList().FirstOrDefault();
+                    if (loginUser == null)
+                    {
+                        //ToDo change this
+                        _loginUserId = Guid.Empty;
+                        //txtUsername.Text = "sudhanshu@vitalwires.com";
+                        //txtPassword.Text = "Luxury@123";
+                        txtUsername.Text = string.Empty;
+                        txtPassword.Text = string.Empty;
+                    }
+                     
+                }
+                else
+                {
+                    _loginUserId = Guid.Empty;
+                    txtUsername.Text = "";
+                    txtPassword.Text = "";
+                }
+            }
+        }
+
+        private bool ValidEntry()
+        {
+            if (string.IsNullOrEmpty(txtUsername.Text))
+            {
+                MessagePopup.ShowWarning("User Name should not be blank");
+                return false;
+            }
+            if (string.IsNullOrEmpty(txtPassword.Text))
+            {
+                MessagePopup.ShowWarning("Password should not be blank");
+                return false;
+            }
+            return true;
+        }
+
+        private void frmLogin_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (e.CloseReason == CloseReason.FormOwnerClosing)
+                this.DialogResult = DialogResult.Cancel;
+        }
+
+        private void linkLblForgotPassword_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            linkLblForgotPassword.LinkVisited = true;
+            try
+            {
+                System.Diagnostics.Process.Start("https://app.beatroute.io");
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|Forgot password link not working.\n" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+                MessagePopup.ShowError("Unable to open Forgot Password link.");
+            }
+        }
+
+        protected override bool ProcessDialogKey(Keys keyData)
+        {
+            if (keyData == (Keys.Control | Keys.L))
+            {
+                frmConnectionCheck frmConnectionCheck = new frmConnectionCheck();
+                frmConnectionCheck.ShowDialog();
+                return true;
+            }
+            return base.ProcessDialogKey(keyData);
+        }
+    }
+}

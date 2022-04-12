@@ -1,0 +1,200 @@
+﻿
+namespace BeatrouteTallyIntegration
+{
+    partial class DatabaseDataViewer
+    {
+        /// <summary>
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary>
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Windows Form Designer generated code
+
+        /// <summary>
+        /// Required method for Designer support - do not modify
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(DatabaseDataViewer));
+            this.sidePanel = new System.Windows.Forms.Panel();
+            this.panel1 = new System.Windows.Forms.Panel();
+            this.btnApiCall = new System.Windows.Forms.Button();
+            this.panel2 = new System.Windows.Forms.Panel();
+            this.logoPanel = new System.Windows.Forms.Panel();
+            this.label2 = new System.Windows.Forms.Label();
+            this.pictureBox1 = new System.Windows.Forms.PictureBox();
+            this.label1 = new System.Windows.Forms.Label();
+            this.userControlPanel = new System.Windows.Forms.Panel();
+            this.btnLogs = new System.Windows.Forms.Button();
+            this.sidePanel.SuspendLayout();
+            this.panel1.SuspendLayout();
+            this.panel2.SuspendLayout();
+            this.logoPanel.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
+            this.SuspendLayout();
+            // 
+            // sidePanel
+            // 
+            this.sidePanel.BackColor = System.Drawing.Color.White;
+            this.sidePanel.Controls.Add(this.panel1);
+            this.sidePanel.Dock = System.Windows.Forms.DockStyle.Left;
+            this.sidePanel.Location = new System.Drawing.Point(0, 0);
+            this.sidePanel.Name = "sidePanel";
+            this.sidePanel.Size = new System.Drawing.Size(200, 599);
+            this.sidePanel.TabIndex = 1;
+            // 
+            // panel1
+            // 
+            this.panel1.BackColor = System.Drawing.Color.White;
+            this.panel1.Controls.Add(this.btnLogs);
+            this.panel1.Controls.Add(this.btnApiCall);
+            this.panel1.Controls.Add(this.panel2);
+            this.panel1.Dock = System.Windows.Forms.DockStyle.Left;
+            this.panel1.Location = new System.Drawing.Point(0, 0);
+            this.panel1.Name = "panel1";
+            this.panel1.Size = new System.Drawing.Size(200, 599);
+            this.panel1.TabIndex = 2;
+            // 
+            // btnApiCall
+            // 
+            this.btnApiCall.BackColor = System.Drawing.Color.Transparent;
+            this.btnApiCall.FlatAppearance.BorderSize = 0;
+            this.btnApiCall.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnApiCall.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.btnApiCall.ForeColor = System.Drawing.Color.Black;
+            this.btnApiCall.Location = new System.Drawing.Point(0, 76);
+            this.btnApiCall.Name = "btnApiCall";
+            this.btnApiCall.Size = new System.Drawing.Size(200, 44);
+            this.btnApiCall.TabIndex = 2;
+            this.btnApiCall.Text = "Api Call";
+            this.btnApiCall.UseVisualStyleBackColor = false;
+            this.btnApiCall.Click += new System.EventHandler(this.btnApiCall_Click);
+            // 
+            // panel2
+            // 
+            this.panel2.BackColor = System.Drawing.Color.White;
+            this.panel2.Controls.Add(this.logoPanel);
+            this.panel2.Dock = System.Windows.Forms.DockStyle.Top;
+            this.panel2.Location = new System.Drawing.Point(0, 0);
+            this.panel2.Name = "panel2";
+            this.panel2.Size = new System.Drawing.Size(200, 76);
+            this.panel2.TabIndex = 1;
+            // 
+            // logoPanel
+            // 
+            this.logoPanel.BackColor = System.Drawing.Color.White;
+            this.logoPanel.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
+            this.logoPanel.Controls.Add(this.label2);
+            this.logoPanel.Controls.Add(this.pictureBox1);
+            this.logoPanel.Controls.Add(this.label1);
+            this.logoPanel.Dock = System.Windows.Forms.DockStyle.Top;
+            this.logoPanel.Location = new System.Drawing.Point(0, 0);
+            this.logoPanel.Name = "logoPanel";
+            this.logoPanel.Size = new System.Drawing.Size(200, 76);
+            this.logoPanel.TabIndex = 1;
+            // 
+            // label2
+            // 
+            this.label2.AutoSize = true;
+            this.label2.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label2.ForeColor = System.Drawing.Color.DeepSkyBlue;
+            this.label2.Location = new System.Drawing.Point(67, 40);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(102, 16);
+            this.label2.TabIndex = 4;
+            this.label2.Text = "Tally Connector";
+            // 
+            // pictureBox1
+            // 
+            this.pictureBox1.Image = ((System.Drawing.Image)(resources.GetObject("pictureBox1.Image")));
+            this.pictureBox1.Location = new System.Drawing.Point(26, 16);
+            this.pictureBox1.Name = "pictureBox1";
+            this.pictureBox1.Size = new System.Drawing.Size(32, 32);
+            this.pictureBox1.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
+            this.pictureBox1.TabIndex = 3;
+            this.pictureBox1.TabStop = false;
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 14.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label1.ForeColor = System.Drawing.Color.DeepSkyBlue;
+            this.label1.Location = new System.Drawing.Point(64, 16);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(106, 24);
+            this.label1.TabIndex = 2;
+            this.label1.Text = "BeatRoute";
+            // 
+            // userControlPanel
+            // 
+            this.userControlPanel.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.userControlPanel.Location = new System.Drawing.Point(200, 0);
+            this.userControlPanel.Name = "userControlPanel";
+            this.userControlPanel.Size = new System.Drawing.Size(721, 599);
+            this.userControlPanel.TabIndex = 5;
+            // 
+            // btnLogs
+            // 
+            this.btnLogs.BackColor = System.Drawing.Color.Transparent;
+            this.btnLogs.FlatAppearance.BorderSize = 0;
+            this.btnLogs.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnLogs.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.btnLogs.ForeColor = System.Drawing.Color.Black;
+            this.btnLogs.Location = new System.Drawing.Point(0, 126);
+            this.btnLogs.Name = "btnLogs";
+            this.btnLogs.Size = new System.Drawing.Size(200, 44);
+            this.btnLogs.TabIndex = 3;
+            this.btnLogs.Text = "Logs";
+            this.btnLogs.UseVisualStyleBackColor = false;
+            this.btnLogs.Click += new System.EventHandler(this.btnLogs_Click);
+            // 
+            // DatabaseDataViewer
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.ClientSize = new System.Drawing.Size(921, 599);
+            this.Controls.Add(this.userControlPanel);
+            this.Controls.Add(this.sidePanel);
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
+            this.Name = "DatabaseDataViewer";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.Text = "DatabaseDataViewer";
+            this.Load += new System.EventHandler(this.DatabaseDataViewer_Load);
+            this.sidePanel.ResumeLayout(false);
+            this.panel1.ResumeLayout(false);
+            this.panel2.ResumeLayout(false);
+            this.logoPanel.ResumeLayout(false);
+            this.logoPanel.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
+            this.ResumeLayout(false);
+
+        }
+
+        #endregion
+        private System.Windows.Forms.Panel sidePanel;
+       
+        private System.Windows.Forms.Panel panel1;
+        private System.Windows.Forms.Panel panel2;
+        private System.Windows.Forms.Panel userControlPanel;
+        private System.Windows.Forms.Button btnApiCall;
+        private System.Windows.Forms.Panel logoPanel;
+        private System.Windows.Forms.Label label2;
+        private System.Windows.Forms.PictureBox pictureBox1;
+        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.Button btnLogs;
+    }
+}

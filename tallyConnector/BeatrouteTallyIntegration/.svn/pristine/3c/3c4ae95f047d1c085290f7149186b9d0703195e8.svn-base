@@ -1,0 +1,215 @@
+﻿namespace BeatrouteTallyIntegration.Controls
+{
+    partial class ctrlSettings
+    {
+        /// <summary> 
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary> 
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Component Designer generated code
+
+        /// <summary> 
+        /// Required method for Designer support - do not modify 
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            this.lblTallyIp = new System.Windows.Forms.Label();
+            this.lblTallyPort = new System.Windows.Forms.Label();
+            this.lblSyncFrequency = new System.Windows.Forms.Label();
+            this.txtTallyIp = new System.Windows.Forms.TextBox();
+            this.txtTallyPort = new System.Windows.Forms.TextBox();
+            this.txtSyncFrequency = new System.Windows.Forms.TextBox();
+            this.btnSave = new System.Windows.Forms.Button();
+            this.btnCancel = new System.Windows.Forms.Button();
+            this.lblVersion = new System.Windows.Forms.Label();
+            this.lblVersionNo = new System.Windows.Forms.Label();
+            this.cmbFreqRange = new System.Windows.Forms.ComboBox();
+            this.SuspendLayout();
+            // 
+            // lblTallyIp
+            // 
+            this.lblTallyIp.AutoSize = true;
+            this.lblTallyIp.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.lblTallyIp.Location = new System.Drawing.Point(16, 19);
+            this.lblTallyIp.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.lblTallyIp.Name = "lblTallyIp";
+            this.lblTallyIp.Size = new System.Drawing.Size(55, 18);
+            this.lblTallyIp.TabIndex = 0;
+            this.lblTallyIp.Text = "Tally IP";
+            // 
+            // lblTallyPort
+            // 
+            this.lblTallyPort.AutoSize = true;
+            this.lblTallyPort.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.lblTallyPort.Location = new System.Drawing.Point(16, 47);
+            this.lblTallyPort.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.lblTallyPort.Name = "lblTallyPort";
+            this.lblTallyPort.Size = new System.Drawing.Size(70, 18);
+            this.lblTallyPort.TabIndex = 1;
+            this.lblTallyPort.Text = "Tally Port";
+            // 
+            // lblSyncFrequency
+            // 
+            this.lblSyncFrequency.AutoSize = true;
+            this.lblSyncFrequency.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.lblSyncFrequency.Location = new System.Drawing.Point(16, 76);
+            this.lblSyncFrequency.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.lblSyncFrequency.Name = "lblSyncFrequency";
+            this.lblSyncFrequency.Size = new System.Drawing.Size(114, 18);
+            this.lblSyncFrequency.TabIndex = 2;
+            this.lblSyncFrequency.Text = "Sync Frequency";
+            // 
+            // txtTallyIp
+            // 
+            this.txtTallyIp.BackColor = System.Drawing.Color.White;
+            this.txtTallyIp.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.txtTallyIp.Location = new System.Drawing.Point(184, 16);
+            this.txtTallyIp.Margin = new System.Windows.Forms.Padding(2);
+            this.txtTallyIp.Name = "txtTallyIp";
+            this.txtTallyIp.Size = new System.Drawing.Size(228, 24);
+            this.txtTallyIp.TabIndex = 3;
+            this.txtTallyIp.Text = "localhost";
+            this.txtTallyIp.TextChanged += new System.EventHandler(this.txtTallyIp_TextChanged);
+            // 
+            // txtTallyPort
+            // 
+            this.txtTallyPort.BackColor = System.Drawing.Color.White;
+            this.txtTallyPort.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.txtTallyPort.Location = new System.Drawing.Point(184, 45);
+            this.txtTallyPort.Margin = new System.Windows.Forms.Padding(2);
+            this.txtTallyPort.Name = "txtTallyPort";
+            this.txtTallyPort.Size = new System.Drawing.Size(228, 24);
+            this.txtTallyPort.TabIndex = 4;
+            this.txtTallyPort.Text = "9000";
+            this.txtTallyPort.TextChanged += new System.EventHandler(this.txtTallyPort_TextChanged);
+            // 
+            // txtSyncFrequency
+            // 
+            this.txtSyncFrequency.BackColor = System.Drawing.Color.White;
+            this.txtSyncFrequency.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.txtSyncFrequency.Location = new System.Drawing.Point(278, 73);
+            this.txtSyncFrequency.Margin = new System.Windows.Forms.Padding(2);
+            this.txtSyncFrequency.Name = "txtSyncFrequency";
+            this.txtSyncFrequency.Size = new System.Drawing.Size(134, 24);
+            this.txtSyncFrequency.TabIndex = 5;
+            this.txtSyncFrequency.Text = "5";
+            this.txtSyncFrequency.TextChanged += new System.EventHandler(this.txtSyncFrequency_TextChanged);
+            // 
+            // btnSave
+            // 
+            this.btnSave.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnSave.BackColor = System.Drawing.Color.SteelBlue;
+            this.btnSave.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnSave.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.btnSave.ForeColor = System.Drawing.Color.White;
+            this.btnSave.Location = new System.Drawing.Point(232, 403);
+            this.btnSave.Name = "btnSave";
+            this.btnSave.Size = new System.Drawing.Size(92, 33);
+            this.btnSave.TabIndex = 13;
+            this.btnSave.Text = "Save";
+            this.btnSave.UseVisualStyleBackColor = false;
+            this.btnSave.Click += new System.EventHandler(this.btnSave_Click);
+            // 
+            // btnCancel
+            // 
+            this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnCancel.BackColor = System.Drawing.Color.SteelBlue;
+            this.btnCancel.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnCancel.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.btnCancel.ForeColor = System.Drawing.Color.White;
+            this.btnCancel.Location = new System.Drawing.Point(328, 403);
+            this.btnCancel.Margin = new System.Windows.Forms.Padding(2);
+            this.btnCancel.Name = "btnCancel";
+            this.btnCancel.Size = new System.Drawing.Size(92, 33);
+            this.btnCancel.TabIndex = 14;
+            this.btnCancel.Text = "Cancel";
+            this.btnCancel.UseVisualStyleBackColor = false;
+            this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
+            // 
+            // lblVersion
+            // 
+            this.lblVersion.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.lblVersion.AutoSize = true;
+            this.lblVersion.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblVersion.Location = new System.Drawing.Point(16, 412);
+            this.lblVersion.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.lblVersion.Name = "lblVersion";
+            this.lblVersion.Size = new System.Drawing.Size(48, 15);
+            this.lblVersion.TabIndex = 22;
+            this.lblVersion.Text = "Version";
+            // 
+            // lblVersionNo
+            // 
+            this.lblVersionNo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.lblVersionNo.AutoSize = true;
+            this.lblVersionNo.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblVersionNo.Location = new System.Drawing.Point(68, 412);
+            this.lblVersionNo.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.lblVersionNo.Name = "lblVersionNo";
+            this.lblVersionNo.Size = new System.Drawing.Size(34, 15);
+            this.lblVersionNo.TabIndex = 23;
+            this.lblVersionNo.Text = "1.0.0";
+            // 
+            // cmbFreqRange
+            // 
+            this.cmbFreqRange.FormattingEnabled = true;
+            this.cmbFreqRange.Location = new System.Drawing.Point(184, 74);
+            this.cmbFreqRange.Name = "cmbFreqRange";
+            this.cmbFreqRange.Size = new System.Drawing.Size(89, 21);
+            this.cmbFreqRange.TabIndex = 24;
+            // 
+            // ctrlSettings
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.Color.White;
+            this.Controls.Add(this.cmbFreqRange);
+            this.Controls.Add(this.lblVersionNo);
+            this.Controls.Add(this.lblVersion);
+            this.Controls.Add(this.btnCancel);
+            this.Controls.Add(this.btnSave);
+            this.Controls.Add(this.txtSyncFrequency);
+            this.Controls.Add(this.txtTallyPort);
+            this.Controls.Add(this.txtTallyIp);
+            this.Controls.Add(this.lblSyncFrequency);
+            this.Controls.Add(this.lblTallyPort);
+            this.Controls.Add(this.lblTallyIp);
+            this.Margin = new System.Windows.Forms.Padding(4);
+            this.Name = "ctrlSettings";
+            this.Size = new System.Drawing.Size(433, 448);
+            this.Load += new System.EventHandler(this.ctrlSettings_Load);
+            this.ResumeLayout(false);
+            this.PerformLayout();
+
+        }
+
+        #endregion
+
+        private System.Windows.Forms.Label lblTallyIp;
+        private System.Windows.Forms.Label lblTallyPort;
+        private System.Windows.Forms.Label lblSyncFrequency;
+        private System.Windows.Forms.TextBox txtTallyIp;
+        private System.Windows.Forms.TextBox txtTallyPort;
+        private System.Windows.Forms.TextBox txtSyncFrequency;
+        private System.Windows.Forms.Button btnSave;
+        private System.Windows.Forms.Button btnCancel;
+        private System.Windows.Forms.Label lblVersion;
+        private System.Windows.Forms.Label lblVersionNo;
+        private System.Windows.Forms.ComboBox cmbFreqRange;
+    }
+}

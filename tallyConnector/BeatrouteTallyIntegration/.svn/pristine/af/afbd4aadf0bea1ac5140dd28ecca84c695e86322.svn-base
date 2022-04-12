@@ -1,0 +1,34 @@
+﻿using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.Models
+{
+    [ModelAttributes(Key = "Id", TableName = "Company")]
+    public class Company
+    {
+        public Guid Id { get; set; }
+        public string CompanyName { get; set; }
+        public bool IsActive { get; set; }
+        public string Guid { get; set; }
+        public bool IsPosted { get;set; }
+        public decimal RetryCount { get; set; }
+        public string PostingMessage { get; set; }
+        public DateTime PostedOn { get; set; }
+        public DateTime ImportedOn { get; set; }
+        public bool ProductMaster { get; set; }
+        public bool CustomerMaster { get; set; }
+        public bool CustomerInvoice { get; set; }
+        public bool CustomerOrder { get; set; }
+        public bool CustomerPayment { get; set; }
+        public bool CustomerOutstanding { get; set; }
+        public bool Stock { get; set; }
+        public bool OrderStatus { get; set; }
+        public bool SalesOrderDeletionChceking { get; set; }
+        public DateTime LastSyncCustomerOutStanding { get; set; }
+        public DateTime LastSyncStock { get; set; }
+    }
+}

@@ -1,0 +1,873 @@
+﻿using NLog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Runtime.CompilerServices;
+using System.Security;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Xml;
+
+[assembly: InternalsVisibleTo("BeatrouteTallyIntegrationTest")]
+[assembly: InternalsVisibleTo("BeatrouteTallyIntegration")]
+namespace BeatrouteTallyIntegrationBase.Tally
+{
+    public class TallyConnector
+    {
+        private const int HTTP_TIMEOUT = 600000;
+        private static Logger _logger = LogManager.GetLogger("HttpLog");
+        private bool _IsXmlFormatSet = false;
+        string _tallyConnectionString;
+
+        internal TallyConnector(string ip, string port)
+        {
+            _tallyConnectionString = "http://" + ip + ":" + port;
+        }
+
+        internal string XMLRequest(string requestXML)
+        {
+            string responseFromServer = string.Empty;
+            try
+            {
+                if (_IsXmlFormatSet == false)
+                {
+                    _IsXmlFormatSet = true;
+                    SetXmlFormat();
+
+                }
+                _logger.Trace(requestXML);
+                HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(_tallyConnectionString);
+                request.Timeout = HTTP_TIMEOUT;
+                request.ContentType = "text/xml";
+                request.Headers.Add("Unicode", "YES");
+                request.Accept = "application/xml";
+                request.Method = "POST";
+                string postData = requestXML;
+                byte[] byteArray = Encoding.Unicode.GetBytes(postData);
+                request.ContentLength = byteArray.Length;
+                System.IO.Stream dataStream = request.GetRequestStream();
+                dataStream.Write(byteArray, 0, byteArray.Length);
+                dataStream.Close();
+
+                HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+                dataStream = response.GetResponseStream();
+                System.IO.StreamReader reader = new System.IO.StreamReader(dataStream, Encoding.Unicode);
+                responseFromServer = reader.ReadToEnd();
+                reader.Close();
+                dataStream.Close();
+                response.Close();
+                _logger.Trace(responseFromServer);
+                return responseFromServer;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal(ex);
+                _logger.Fatal(_tallyConnectionString);
+                _logger.Fatal("");
+                _logger.Fatal(requestXML);
+                _logger.Fatal("");
+                _logger.Fatal(responseFromServer);
+                _logger.Fatal("");
+
+                throw;
+            }
+        }
+
+        internal string CleanInvalidXmlChars(string text)
+        {
+            string pattern = @"&#4;";
+            string response = Regex.Replace(text, pattern, "", RegexOptions.Compiled);
+            //\x00-\x08\x0B\x0C
+            //\x26
+            pattern = "[\x00\x04\x05\x08\x0B\x0C\x0E-\x1F]";
+            response = Regex.Replace(text, pattern, "", RegexOptions.Compiled);
+
+            return response;
+        }
+
+        private void SetXmlFormat()
+        {
+            string SetXmlFormat = "<ENVELOPE>" +
+            "   <HEADER>" +
+            "       <VERSION>1</VERSION>" +
+            "       <TALLYREQUEST>Export</TALLYREQUEST>" +
+            "       <TYPE>Collection</TYPE>" +
+            "       <ID>Currency</ID>" +
+            "   </HEADER>" +
+            "   <BODY>" +
+            "       <DESC>" +
+            "           <STATICVARIABLES>" +
+            "               <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+            "           </STATICVARIABLES>" +
+            "       </DESC>" +
+            "   </BODY>" +
+            "</ENVELOPE>";
+            XMLRequest(SetXmlFormat);
+            //_IsXmlFormatSet = true;
+            //_IsXmlFormatSet = false;
+        }
+
+        internal bool IsTallyEducational()
+        {
+            string requestXML = "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Function</TYPE><ID>$$LicenseInfo</ID></HEADER>" +
+                                "<BODY><DESC><FUNCPARAMLIST><PARAM>IsEducationalMode</PARAM></FUNCPARAMLIST></DESC></BODY></ENVELOPE>";
+            string responseXML = XMLRequest(requestXML);
+            XmlDocument XMLDom = new XmlDocument();
+            XmlNodeList XMLNodes;
+
+            XMLDom.LoadXml(responseXML);
+            XMLNodes = XMLDom.GetElementsByTagName("RESULT");
+
+            if (XMLNodes == null || XMLNodes.Count == 0)
+                return false;
+            else if (XMLNodes[0].InnerText == "Yes")
+                return true;
+            else
+                return false;
+        }
+
+        internal bool IsCompanyOpenInTally(string companyName)
+        {
+            //SetXmlFormat();
+            string[] companyNames = GetCompaniesOpenInTally();
+            foreach (string s in companyNames)
+                if (s == companyName)
+                    return true;
+            return false;
+        }
+
+        internal bool IsTallyOpen()
+        {
+            try
+            {
+                string requestXML = "";
+                string responseXML = XMLRequest(requestXML);
+                //returnMessage = responseXML;
+                if (responseXML.Contains("<RESPONSE>Tally.ERP 9 Server is Running</RESPONSE>") || responseXML.Contains("<RESPONSE>TallyPrime Server is Running</RESPONSE>"))
+                    return true;
+                else
+                    return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal(ex);
+                _logger.Fatal("");
+                return false;
+            }
+        }
+
+        internal string[] GetCompaniesOpenInTally()
+        {
+            SetXmlFormat();
+            int n;
+            string[] CompanyNames = new string[50];
+            string RequestXML = "<ENVELOPE><HEADER><TALLYREQUEST>Export Data</TALLYREQUEST></HEADER><BODY><EXPORTDATA><REQUESTDESC><REPORTNAME>List of Companies</REPORTNAME><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></REQUESTDESC></EXPORTDATA></BODY></ENVELOPE>";
+            //Works in Educational Mode. But not required currently
+            //string RequestXML = "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>List of Companies</ID></HEADER><BODY><DESC></DESC></BODY></ENVELOPE>";
+            string ResponseXML = XMLRequest(RequestXML);
+
+            XmlDocument XMLDom = new XmlDocument();
+            XmlNodeList XMLNodes;
+
+            XMLDom.LoadXml(ResponseXML);
+            XMLNodes = XMLDom.GetElementsByTagName("COMPANYNAME");
+            //CompanyNames[0] = XMLNodes.Count.ToString();
+            if (XMLNodes.Count > 0)
+            {
+                for (n = 0; n < XMLNodes.Count; n++)
+                    CompanyNames[n + 1] = XMLNodes[n].InnerText;
+            }
+            //Subhabrata 11-Nov-2020 : Changes for Tally Prime version
+            string requestXML = "";
+            string responseXML = XMLRequest(requestXML);
+            if (XMLNodes.Count == 0 && responseXML.Contains("<RESPONSE>TallyPrime Server is Running</RESPONSE>"))
+            {
+                RequestXML = @"<ENVELOPE>
+                                <HEADER>
+                                    <VERSION>1</VERSION>
+                                    <TALLYREQUEST>EXPORT</TALLYREQUEST>
+                                    <TYPE>COLLECTION</TYPE>
+                                    <ID>Remote Collection</ID>
+                                </HEADER>
+                                <BODY>
+                                    <DESC>
+                                        <STATICVARIABLES>
+                                            <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+                                        </STATICVARIABLES>
+                                        <TDL>
+                                            <TDLMESSAGE>
+                                                <COLLECTION NAME = ""Remote Collection"" ISINITIALIZE = ""Yes"">
+                                                    <TYPE> Company </TYPE>
+                                                </COLLECTION>
+                                            </TDLMESSAGE>
+                                        </TDL>
+                                    </DESC>
+                                </BODY>
+                            </ENVELOPE>
+                            ";
+
+                ResponseXML = XMLRequest(RequestXML);
+                _logger.Trace(ResponseXML);
+                XMLDom = new XmlDocument();
+                XmlNodeList XMLNodesPrime;
+
+                XMLDom.LoadXml(ResponseXML);
+                XMLNodesPrime = XMLDom.GetElementsByTagName("COMPANY");
+                if (XMLNodesPrime.Count > 0)
+                {
+                    int x = 0;
+                    foreach (XmlNode item in XMLNodesPrime)
+                    {
+
+                        var attr = item.Attributes["NAME"];
+                        if (attr != null)
+                        {
+                            CompanyNames[x] = attr.Value;
+                            x++;
+                        }
+                    }
+
+                }
+            }
+
+            return CompanyNames;
+        }
+
+        internal string GetMasters(string companyName, long alterID, string masterType, string fields)
+        {
+            string[] fieldList = fields.Split(',');
+
+            string RequestXML = "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+                            "<TYPE>COLLECTION</TYPE>" +
+                            "<ID>Remote Collection</ID>" +
+                            "</HEADER>" +
+                            "<BODY><DESC><STATICVARIABLES>" +
+                            "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+                            "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyName) + "</SVCURRENTCOMPANY>" +
+                            "<SVFROMDATE TYPE=\"Date\">1-Apr-2001</SVFROMDATE>" +
+                            "<SVTODATE TYPE=\"Date\">31-Mar-2030</SVTODATE>" +
+                            "</STATICVARIABLES>" +
+                            "<TDL><TDLMESSAGE>" +
+                            "<COLLECTION NAME = \"Remote Collection\" ISINITIALIZE=\"Yes\">" +
+                            "<TYPE>" + masterType + "</TYPE>";
+
+            foreach (string field in fieldList)
+                RequestXML += "<NATIVEMETHOD>" + field + "</NATIVEMETHOD>";
+
+            RequestXML += "<FILTERS>MasterAlterID</FILTERS>" +
+                            "</COLLECTION>" +
+                            "<SYSTEM TYPE =\"Formulae\" NAME=\"MasterAlterID\">" +
+                            "$AlterID > " + alterID.ToString() +
+                            "</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>";
+
+            string ResponseXML = XMLRequest(RequestXML);
+            return ResponseXML;
+        }
+
+        internal string GetAdjustment(string companyOfCustomer, DateTime dateFrom, DateTime dateTo, int masterId, int maxAlterId, string fields)
+        {
+            string[] fieldList = fields.Split(',');
+
+            string RequestXML = "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+                                "<TYPE>COLLECTION</TYPE><ID>AdjustmentCollection</ID></HEADER>" +
+                                "<BODY><DESC>" +
+                                "<STATICVARIABLES>" +
+                                "<SVEXPORTFORMAT>$$SysName:XML </SVEXPORTFORMAT>" +
+                                "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyOfCustomer) + "</SVCURRENTCOMPANY>" +
+                                "<SVFROMDATE TYPE = \"Date\">" + dateFrom.ToString("dd-MMM-yyyy") + "</SVFROMDATE>" +
+                                "<SVTODATE TYPE = \"Date\">" + dateTo.ToString("dd-MMM-yyyy") + "</SVTODATE>" +
+                                "</STATICVARIABLES><TDL><TDLMESSAGE>" +
+                                "<COLLECTION NAME = \"VouchersCollection\" ISINITIALIZE = \"Yes\">" +
+                                "<TYPE>VOUCHERS</TYPE>" +
+                                "<BELONGSTO>Yes</BELONGSTO>" +
+                                "<CHILDOF>##SVCURRENTCOMPANY</CHILDOF>" +
+                                "</COLLECTION>" +
+                                "<COLLECTION NAME = \"AdjustmentCollection\" ISINITIALIZE = \"Yes\">" +
+                                "<SOURCECOLLECTION>VouchersCollection</SOURCECOLLECTION>" +
+                                "<WALK>LedgerEntries</WALK>" +
+                                "<METHOD>VoucherGuid:$guid</METHOD>" +
+                                "<METHOD>VoucherMasterId:$masterId</METHOD>" +
+                                "<METHOD>VoucherNo:$vouchernumber</METHOD>" +
+                                "<METHOD>VoucherDate:$Date</METHOD>" +
+                                "<METHOD>VoucherTypeName:$VoucherTypeName</METHOD>" +
+                                "<METHOD>LedgerName:$.LedgerName</METHOD>" +
+                                "<METHOD>LedgerAmount:$.Amount</METHOD>" +
+                                "<METHOD>LedgerMasterId:$MasterID:Ledger:$.LedgerName</METHOD>" +
+                                "<METHOD>LedgerGroup:$Parent:Ledger:$.LedgerName</METHOD>" +
+                                "<METHOD>VoucherAlterID:$AlterId</METHOD>" +
+                                "<METHOD>IsReceipt:$$IsReceipt:$VoucherTypeName</METHOD>" +
+                                "<METHOD>IsPayment:$$IsPayment:$VoucherTypeName</METHOD>" +
+                                "<METHOD>IsJournal:$$IsJournal:$VoucherTypeName</METHOD>" +
+                                "<METHOD>IsDebitNote:$$IsDebitNote:$VoucherTypeName</METHOD>" +
+                                "<METHOD>IsCreditNote:$$IsCreditNote:$VoucherTypeName</METHOD>" +
+                                "<METHOD>Narration:$$Owner:$NARRATION</METHOD>";
+
+            foreach (string field in fieldList)
+                RequestXML += "<NATIVEMETHOD>" + field + "</NATIVEMETHOD>";
+
+            RequestXML += "<FILTERS>LedgerNameFilter</FILTERS>" +
+                          "<FILTERS>AlterIDFilter</FILTERS>" +
+                          "<FILTERS>VoucherTypeFilter</FILTERS>" +
+                          "</COLLECTION>" +
+                          "<OBJECT NAME = \"Ledger Entry\" ISMODIFY = \"Yes\">" +
+                          "<LedgerMasterID>$MasterID:Ledger:$LedgerName</LedgerMasterID>" +
+                          "</OBJECT>" +
+                          "<SYSTEM TYPE = \"Formulae\" NAME = \"VoucherTypeFilter\">$$IsReceipt:$VoucherTypeName Or $$IsJournal:$VoucherTypeName Or $$IsDebitNote:$VoucherTypeName Or $$IsPayment:$VoucherTypeName Or $$IsCreditNote:$VoucherTypeName </SYSTEM>" +
+                          "<SYSTEM TYPE = \"Formulae\" NAME = \"AlterIDFilter\">$VoucherAlterId &gt; " + maxAlterId + "</SYSTEM>" +
+                          "<SYSTEM TYPE = \"Formulae\" NAME = \"LedgerNameFilter\">$LedgerMasterId &gt; " + masterId + " </SYSTEM>" +
+                          "</TDLMESSAGE></TDL></DESC></BODY></ENVELOPE> ";
+
+
+
+            string ResponseXML = XMLRequest(RequestXML);
+            return ResponseXML;
+        }
+
+        internal string GetFullMasters(string companyName, string masterType, string fields)
+        {
+            string[] fieldList = fields.Split(',');
+
+            string RequestXML = "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+                            "<TYPE>COLLECTION</TYPE>" +
+                            "<ID>Remote Collection</ID>" +
+                            "</HEADER>" +
+                            "<BODY><DESC><STATICVARIABLES>" +
+                            "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+                            "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyName) + "</SVCURRENTCOMPANY>" +
+                            "<SVFROMDATE TYPE=\"Date\">1-Apr-2001</SVFROMDATE>" +
+                            "<SVTODATE TYPE=\"Date\">31-Mar-2030</SVTODATE>" +
+                            "</STATICVARIABLES>" +
+                            "<TDL><TDLMESSAGE>" +
+                            "<COLLECTION NAME = \"Remote Collection\" ISINITIALIZE=\"Yes\">" +
+                            "<TYPE>" + masterType + "</TYPE>";
+
+            foreach (string field in fieldList)
+                RequestXML += "<NATIVEMETHOD>" + field + "</NATIVEMETHOD>";
+
+            RequestXML += "</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>";
+
+            string ResponseXML = XMLRequest(RequestXML);
+            return ResponseXML;
+        }
+
+        internal string GetTransaction(string companyName, int alterId, string fields, DateTime startVoucherDate, DateTime endVoucherDate)
+        {
+            string[] fieldList = fields.Split(',');
+
+            string RequestXML = "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+                            "<TYPE>COLLECTION</TYPE>" +
+                            "<ID>Remote Collection</ID>" +
+                            "</HEADER>" +
+                            "<BODY><DESC><STATICVARIABLES>" +
+                            "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+                            "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyName) + "</SVCURRENTCOMPANY>" +
+                            "<SVFROMDATE TYPE=\"Date\">" + startVoucherDate.ToString("dd-MMM-yyyy") + "</SVFROMDATE>" +
+                            "<SVTODATE TYPE=\"Date\">" + endVoucherDate.ToString("dd-MMM-yyyy") + "</SVTODATE>" +
+                            "</STATICVARIABLES>" +
+                            "<TDL><TDLMESSAGE>" +
+                            "<COLLECTION NAME = \"Remote Collection\" ISINITIALIZE=\"Yes\">" +
+                            "<TYPE>" + "VOUCHER" + "</TYPE>";
+
+            foreach (string field in fieldList)
+                RequestXML += "<NATIVEMETHOD>" + field + "</NATIVEMETHOD>";
+
+            RequestXML += "<FILTERS>MasterAlterID</FILTERS>" +
+                            "</COLLECTION>" +
+                            "<SYSTEM TYPE =\"Formulae\" NAME=\"MasterAlterID\">" +
+                            "$AlterID &gt;= " + alterId +
+                            "</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>";
+
+            string ResponseXML = XMLRequest(RequestXML);
+            return ResponseXML;
+        }
+
+        internal string GetAllTransactions(string companyName, int alterId, string fields)
+        {
+            string[] fieldList = fields.Split(',');
+            DateTime startVoucherDate = new DateTime(2019, 04, 01);
+            DateTime endVoucherDate = new DateTime(2021, 03, 31);
+
+            string RequestXML = "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+                            "<TYPE>COLLECTION</TYPE>" +
+                            "<ID>Remote Collection</ID>" +
+                            "</HEADER>" +
+                            "<BODY><DESC><STATICVARIABLES>" +
+                            "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+                            "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyName) + "</SVCURRENTCOMPANY>" +
+                            "<SVFROMDATE TYPE=\"Date\">" + startVoucherDate.ToString("dd-MMM-yyyy") + "</SVFROMDATE>" +
+                            "<SVTODATE TYPE=\"Date\">" + endVoucherDate.ToString("dd-MMM-yyyy") + "</SVTODATE>" +
+                            "</STATICVARIABLES>" +
+                            "<TDL><TDLMESSAGE>" +
+                            "<COLLECTION NAME = \"Remote Collection\" ISINITIALIZE=\"Yes\">" +
+                            "<TYPE>" + "VOUCHER" + "</TYPE>";
+
+            foreach (string field in fieldList)
+                RequestXML += "<NATIVEMETHOD>" + field + "</NATIVEMETHOD>";
+
+            RequestXML += "<FILTERS>MasterAlterID</FILTERS>" +
+                            "</COLLECTION>" +
+                            "<SYSTEM TYPE =\"Formulae\" NAME=\"MasterAlterID\">" +
+                            "$AlterID &gt;= " + alterId +
+                            "</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>";
+
+            string ResponseXML = XMLRequest(RequestXML);
+            return ResponseXML;
+        }
+
+        internal string GetTransaction(string companyName, int masterId, string fields)
+        {
+            string[] fieldList = fields.Split(',');
+            DateTime startVoucherDate = new DateTime(2019, 04, 01);
+            DateTime endVoucherDate = new DateTime(2021, 03, 31);
+
+            string RequestXML = "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+                            "<TYPE>COLLECTION</TYPE>" +
+                            "<ID>Remote Collection</ID>" +
+                            "</HEADER>" +
+                            "<BODY><DESC><STATICVARIABLES>" +
+                            "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+                            "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyName) + "</SVCURRENTCOMPANY>" +
+                            "<SVFROMDATE TYPE=\"Date\">" + startVoucherDate.ToString("dd-MMM-yyyy") + "</SVFROMDATE>" +
+                            "<SVTODATE TYPE=\"Date\">" + endVoucherDate.ToString("dd-MMM-yyyy") + "</SVTODATE>" +
+                            "</STATICVARIABLES>" +
+                            "<TDL><TDLMESSAGE>" +
+                            "<COLLECTION NAME = \"Remote Collection\" ISINITIALIZE=\"Yes\">" +
+                            "<TYPE>" + "VOUCHER" + "</TYPE>";
+
+            foreach (string field in fieldList)
+                RequestXML += "<NATIVEMETHOD>" + field + "</NATIVEMETHOD>";
+
+            RequestXML += "<FILTERS>MasterAlterID</FILTERS>" +
+                            "</COLLECTION>" +
+                            "<SYSTEM TYPE =\"Formulae\" NAME=\"MasterAlterID\">" +
+                            "$MasterID = " + masterId +
+                            "</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>";
+
+            string ResponseXML = XMLRequest(RequestXML);
+            return ResponseXML;
+        }
+
+
+        //internal string c(string companyName, string partyName, string billName, string reportName)
+        //{
+        //    string requestXml = "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+        //                        "<TYPE>COLLECTION</TYPE>" +
+        //                        "<ID>" + SecurityElement.Escape(reportName) + "</ID>" +
+        //                        "</HEADER>" +
+        //                        "<BODY><DESC><STATICVARIABLES>" +
+        //                        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+        //                        "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyName) + "</SVCURRENTCOMPANY>" +
+        //                        "<SVPARTYLEDGERNAME>" + SecurityElement.Escape(partyName) + "</SVPARTYLEDGERNAME>" +
+        //                        "<SVBILLNAME>" + SecurityElement.Escape(billName) + "</SVBILLNAME>" +
+        //                        "</STATICVARIABLES>" +
+        //                        "</DESC>" +
+        //                        "</BODY>" +
+        //                        "</ENVELOPE>";
+        //    string ResponseXML = XMLRequest(requestXml);
+        //    return ResponseXML;
+        //}
+
+        internal string GetInvoice(string companyName, string fields, DateTime startDate, DateTime endDate, int maxAlterId)
+        {
+            string[] fieldList = fields.Split(',');
+
+            string RequestXML = "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+                "<TYPE>COLLECTION</TYPE>" +
+                "<ID>Remote Collection 2</ID>" +
+                "</HEADER>" +
+                "<BODY><DESC><STATICVARIABLES>" +
+                "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+                "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyName) + "</SVCURRENTCOMPANY>" +
+                "<SVFROMDATE TYPE = \"Date\">" + startDate.ToString("dd-MMM-yyyy") + "</SVFROMDATE>" +
+                "<SVTODATE TYPE = \"Date\">" + endDate.ToString("dd-MMM-yyyy") + "</SVTODATE>" +
+                "</STATICVARIABLES>" +
+                "<TDL><TDLMESSAGE>" +
+                "<COLLECTION NAME = \"Remote Collection 1\" ISINITIALIZE =\"Yes\">" +
+                "<TYPE>VOUCHERS</TYPE>" +
+                "<BELONGSTO>Yes</BELONGSTO>" +
+                "<CHILDOF>##SVCURRENTCOMPANY</CHILDOF>" +
+                "</COLLECTION>" +
+                "<COLLECTION NAME = \"Remote Collection 2\" ISINITIALIZE = \"Yes\">" +
+                "<SOURCECOLLECTION>Remote Collection 1</SOURCECOLLECTION>";
+
+            foreach (string field in fieldList)
+                RequestXML += "<NATIVEMETHOD>" + field + "</NATIVEMETHOD>";
+
+            RequestXML += "<METHOD>IsSales: $$IsSales:$VoucherTypeName</METHOD>" +
+                          "<METHOD>IsDebitNote: $$IsDebitNote:$VoucherTypeName</METHOD>" +
+                          "<METHOD>IsCreditNote: $$IsCreditNote:$VoucherTypeName</METHOD>" +
+                          "<NATIVEMETHOD>ALLLEDGERENTRIES.INVENTORYALLOCATIONS.ITEMHSNCODE</NATIVEMETHOD>" +
+                          "<NATIVEMETHOD>ALLLEDGERENTRIES.INVENTORYALLOCATIONS.ITEMGSTRATE</NATIVEMETHOD>" +
+                          "<NATIVEMETHOD>ALLLEDGERENTRIES.INVENTORYALLOCATIONS.GSTTYPEOFSUPPLYA</NATIVEMETHOD>" +
+                          "<METHOD>VoucherMasterId:$masterId</METHOD>" +
+                          "<FILTERS>VoucherTypeFilter</FILTERS>" +
+                          "<FILTERS>AlterIDFilter</FILTERS>" +
+                          "</COLLECTION>" +
+                          "<OBJECT NAME=\"Ledger Entry\" ISMODIFY=\"Yes\">" +
+                          "<LOCALFORMULA>LedgerMasterID:$MasterID:Ledger:$LedgerName</LOCALFORMULA>" +
+                          "<LOCALFORMULA>LedgerTaxType:$GSTDUTYHEAD:Ledger:$LedgerName</LOCALFORMULA>" +
+                          "<LOCALFORMULA>LedgerTaxRate:$RATEOFTAXCALCULATION:Ledger:$LedgerName</LOCALFORMULA>" +
+                          "</OBJECT>" +
+                          "<OBJECT NAME=\"InventoryEntry\" ISMODIFY=\"Yes\">" +
+                          "<LOCALFORMULA>ItemHsnCode:$$GetInfoFromHierarchy:$StockItemName:\"StockItem\":\"HSNCode\":$Date:\"GST\"</LOCALFORMULA>" +
+                          "<LOCALFORMULA>ItemGstRate:$$GetInfoFromHierarchy:$StockItemName:\"StockItem\":\"GSTRate\":$Date:\"GST\":0:\"Integrated Tax\"</LOCALFORMULA>" +
+                          "<LOCALFORMULA>GSTTypeofSupplyA:$GSTTYPEOFSUPPLY:StockItem:$StockItemName</LOCALFORMULA>" +
+                          "</OBJECT>" +
+                          "<SYSTEM TYPE =\"Formulae\" NAME=\"VoucherTypeFilter\">$$IsSales:$VoucherTypeName Or $$IsDebitNote:$VoucherTypeName Or $$IsCreditNote:$VoucherTypeName</SYSTEM>" +
+                          "<SYSTEM TYPE = \"Formulae\" NAME = \"AlterIDFilter\">$AlterId &gt; " + maxAlterId + "</SYSTEM>" +
+                          "</TDLMESSAGE></TDL>" +
+                          "</DESC></BODY></ENVELOPE>";
+
+            string ResponseXML = XMLRequest(RequestXML);
+            return ResponseXML;
+        }
+
+        //internal string GetOrder(string companyName, string fields, DateTime startDate, DateTime endDate, int maxAlterId)
+        //{
+        //    string[] fieldList = fields.Split(',');
+
+        //    string RequestXML = "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+        //        "<TYPE>COLLECTION</TYPE>" +
+        //        "<ID>Remote Collection 2</ID>" +
+        //        "</HEADER>" +
+        //        "<BODY><DESC><STATICVARIABLES>" +
+        //        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+        //        "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyName) + "</SVCURRENTCOMPANY>" +
+        //        "<SVFROMDATE TYPE = \"Date\">" + startDate.ToString("dd-MMM-yyyy") + "</SVFROMDATE>" +
+        //        "<SVTODATE TYPE = \"Date\">" + endDate.ToString("dd-MMM-yyyy") + "</SVTODATE>" +
+        //        "</STATICVARIABLES>" +
+        //        "<TDL><TDLMESSAGE>" +
+        //        "<COLLECTION NAME = \"Remote Collection 1\" ISINITIALIZE =\"Yes\">" +
+        //        "<TYPE>VOUCHERS</TYPE>" +
+        //        "<BELONGSTO>Yes</BELONGSTO>" +
+        //        "<CHILDOF>##SVCURRENTCOMPANY</CHILDOF>" +
+        //        "</COLLECTION>" +
+        //        "<COLLECTION NAME = \"Remote Collection 2\" ISINITIALIZE = \"Yes\">" +
+        //        "<SOURCECOLLECTION>Remote Collection 1</SOURCECOLLECTION>";
+
+        //    foreach (string field in fieldList)
+        //        RequestXML += "<NATIVEMETHOD>" + field + "</NATIVEMETHOD>";
+
+        //    RequestXML += "<NATIVEMETHOD>ALLINVENTORYENTRIES.INVENTORYALLOCATIONS.ITEMHSNCODE</NATIVEMETHOD>" +
+
+        //                  "<NATIVEMETHOD>ISCANCELLED</NATIVEMETHOD>" +
+        //                  "<METHOD>VoucherMasterId:$masterId</METHOD>" +
+        //                  "<FILTERS>VoucherTypeFilter</FILTERS>" +
+        //                  "<FILTERS>AlterIDFilter</FILTERS>" +
+        //                  "</COLLECTION>" +
+        //                  "<OBJECT NAME=\"Ledger Entry\" ISMODIFY=\"Yes\">" +
+        //                  "<LOCALFORMULA>LedgerMasterID:$MasterID:Ledger:$LedgerName</LOCALFORMULA>" +
+        //                  "<LOCALFORMULA>LedgerTaxType:$GSTDUTYHEAD:Ledger:$LedgerName</LOCALFORMULA>" +
+        //                  "<LOCALFORMULA>LedgerTaxRate:$RATEOFTAXCALCULATION:Ledger:$LedgerName</LOCALFORMULA>" +
+        //                  "</OBJECT>" +
+        //                  "<OBJECT NAME=\"InventoryEntry\" ISMODIFY=\"Yes\">" +
+        //                  "<LOCALFORMULA>ItemHsnCode:$$GetInfoFromHierarchy:$StockItemName:\"StockItem\":\"HSNCode\":$Date:\"GST\"</LOCALFORMULA>" +
+        //                  "<LOCALFORMULA>ItemGstRate:$$GetInfoFromHierarchy:$StockItemName:\"StockItem\":\"GSTRate\":$Date:\"GST\":0:\"Integrated Tax\"</LOCALFORMULA>" +
+        //                  "<LOCALFORMULA>GSTTypeofSupplyA:$GSTTYPEOFSUPPLY:StockItem:$StockItemName</LOCALFORMULA>" +
+        //                  "</OBJECT>" +
+        //                  "<SYSTEM TYPE =\"Formulae\" NAME=\"VoucherTypeFilter\">$$IsSales:$VoucherTypeName Or $$IsDebitNote:$VoucherTypeName Or $$IsCreditNote:$VoucherTypeName</SYSTEM>" +
+        //                  "<SYSTEM TYPE = \"Formulae\" NAME = \"AlterIDFilter\">$AlterId &gt; " + maxAlterId + "</SYSTEM>" +
+        //                  "</TDLMESSAGE></TDL>" +
+        //                  "</DESC></BODY></ENVELOPE>";
+
+        //    string ResponseXML = XMLRequest(RequestXML);
+        //    return ResponseXML;
+        //}
+
+        internal string GetOrderStatus(string companyName, string fields, DateTime startDate, DateTime endDate, int maxAlterId)
+        {
+            string[] fieldList = fields.Split(',');
+            string RequestXML = "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+                            "<TYPE>COLLECTION</TYPE>" +
+                            "<ID>Remote Collection</ID>" +
+                            "</HEADER>" +
+                            "<BODY><DESC><STATICVARIABLES>" +
+                            "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+                            "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyName) + "</SVCURRENTCOMPANY>" +
+                            "<SVFROMDATE TYPE=\"Date\">" + startDate.ToString("dd-MMM-yyyy") + "</SVFROMDATE>" +
+                            "<SVTODATE TYPE=\"Date\">" + endDate.ToString("dd-MMM-yyyy") + "</SVTODATE>" +
+                            "</STATICVARIABLES>" +
+                            "<TDL><TDLMESSAGE>" +
+                            "<COLLECTION NAME = \"Remote Collection\" ISINITIALIZE=\"Yes\">" +
+                            "<TYPE>" + "VOUCHER" + "</TYPE>" +
+                            "<METHOD>IsSalesOrder:$$IsSalesOrder:$VoucherTypeName</METHOD>" +
+                            "<METHOD>RemoteId2:$RemoteGuid</METHOD>";
+
+            foreach (string field in fieldList)
+                RequestXML += "<NATIVEMETHOD>" + field + "</NATIVEMETHOD>";
+
+            RequestXML += "<FILTERS>MasterAlterID</FILTERS>" +
+                            "<FILTERS>VoucherTypeFilter</FILTERS>" +
+                            "</COLLECTION>" +
+                        "<SYSTEM TYPE = \"Formulae\" NAME = \"MasterAlterID\">" +
+                        "$AlterID &gt; " + maxAlterId +
+                        "</SYSTEM>" +
+                        "<SYSTEM TYPE = \"Formulae\" NAME = \"VoucherTypeFilter\">$$IsSalesOrder:$VoucherTypeName</SYSTEM>" +
+                        "<OBJECT NAME = \"LedgerEntry\" ISMODIFY = \"Yes\">" +
+                        "<LOCALFORMULA>LedgerGuid:$Guid:Ledger:$LedgerName</LOCALFORMULA>" +
+                        "</OBJECT>" +
+                        "<OBJECT NAME=\"InventoryEntry\" ISMODIFY=\"Yes\">" +
+                        "<LOCALFORMULA>StockItemGuid:$Guid:StockItem:$StockItemName</LOCALFORMULA>" +
+                        "</OBJECT>" +
+                        "<OBJECT NAME=\"Voucher\" ISMODIFY=\"Yes\">" +
+                        "<LOCALFORMULA>PartyLedgerGuid:$Guid:Ledger:$PartyLedgerName</LOCALFORMULA>" +
+                        "</OBJECT>" +
+                        "</TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>";
+
+            string ResponseXML = XMLRequest(RequestXML);
+            return ResponseXML;
+
+
+        }
+
+        internal string GetVoucherStatistics(string companyName, DateTime startDate, DateTime endDate, string voucherTypeName)
+        {
+            string RequestXML = @"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+                                "<TYPE>COLLECTION</TYPE>" +
+                                "<ID>STATVchType1</ID>" +
+                                "</HEADER>" +
+                                "<BODY><DESC>" +
+                                "<STATICVARIABLES>" +
+                                    "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+                                    "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyName) + @"</SVCURRENTCOMPANY>" +
+                                    "<SVFROMDATE TYPE=\"Date\">" + startDate.ToString("dd-MMM-yyyy") + @"</SVFROMDATE>" +
+                                    "<SVTODATE TYPE=\"Date\"> " + endDate.ToString("dd-MMM-yyyy") + @"</SVTODATE>" +
+                                " </STATICVARIABLES>" +
+                                "<TDL>" +
+                                "<TDLMESSAGE>" +
+                                "<COLLECTION NAME = \"STATVchType1\" ISINITIALIZE=\"Yes\">" +
+                                "<TYPE>VoucherType</TYPE>";
+            if (string.IsNullOrEmpty(voucherTypeName))
+                RequestXML += "<FILTERS></FILTERS>";
+            else
+                RequestXML += "<FILTERS>VoucherTypeNameFilter</FILTERS>";
+
+            RequestXML += "<NATIVEMETHOD>MasterID</NATIVEMETHOD>" +
+                                "<NATIVEMETHOD>StatVal</NATIVEMETHOD>" +
+                                "<NATIVEMETHOD>CancVal</NATIVEMETHOD>" +
+                                "</COLLECTION>" +
+                                    "<SYSTEM TYPE =\"Formulae\" NAME=\"VoucherTypeNameFilter\">" +
+                                    "$Name = \"" + SecurityElement.Escape(voucherTypeName) + "\"" + //Subhabrata 12-Apr-2021 : Changes for task TC1-T683
+                                    "</SYSTEM>" +
+                                "</TDLMESSAGE>" +
+                                "</TDL>" +
+                                "</DESC></BODY></ENVELOPE>";
+            string ResponseXML = XMLRequest(RequestXML);
+            return ResponseXML;
+        }
+
+        internal string GetCompanyDetails(string companyName, string fields)
+        {
+            string[] fieldList = fields.Split(',');
+
+            string RequestXML = "<ENVELOPE>" +
+                                "<HEADER><VERSION> 1 </VERSION><TALLYREQUEST> EXPORT </TALLYREQUEST>" +
+                                "<TYPE> COLLECTION </TYPE><ID> Remote Collection 2 </ID></HEADER>" +
+                                "<BODY><DESC>" +
+                                "<STATICVARIABLES>" +
+                                "<SVEXPORTFORMAT>$$SysName: XML </SVEXPORTFORMAT>" +
+                                "</STATICVARIABLES>" +
+                                "<TDL><TDLMESSAGE>" +
+                                "<COLLECTION NAME = \"Remote Collection 1\" ISINITIALIZE = \"Yes\">" +
+                                "<TYPE> Company </TYPE>" +
+                                "<BELONGSTO> Yes </BELONGSTO>" +
+                                "</COLLECTION>" +
+                                "<COLLECTION NAME = \"Remote Collection 2\" ISINITIALIZE = \"Yes\">" +
+                                "<SOURCECOLLECTION> Remote Collection 1 </SOURCECOLLECTION>";
+
+            foreach (string field in fieldList)
+                RequestXML += "<NATIVEMETHOD>" + field + "</NATIVEMETHOD>";
+
+            RequestXML += "<FILTERS>CompanyFilter</FILTERS>" +
+                          "</COLLECTION>" +
+                          "<SYSTEM TYPE = \"Formulae\" NAME = \"CompanyFilter\">$Name = '" + SecurityElement.Escape(companyName) + "' </SYSTEM>" +
+                          "</TDLMESSAGE></TDL>" +
+                          "</DESC></BODY></ENVELOPE>";
+
+            string ResponseXML = XMLRequest(RequestXML);
+            return ResponseXML;
+        }
+
+        internal string GetGSTNumber(string companyName)
+        {
+            string RequestXML = "<ENVELOPE><HEADER><VERSION> 1 </VERSION><TALLYREQUEST> EXPORT </TALLYREQUEST>" +
+                                "<TYPE> COLLECTION </TYPE><ID> Remote Collection 2 </ID></HEADER>" +
+                                "<BODY><DESC>" +
+                                "<STATICVARIABLES>" +
+                                "<SVEXPORTFORMAT>$$SysName: XML </SVEXPORTFORMAT>" +
+                                "</STATICVARIABLES>" +
+                                "<TDL><TDLMESSAGE>" +
+                                "<COLLECTION NAME = \"Remote Collection 0\" ISINITIALIZE = \"Yes\">" +
+                                "<TYPE> Company </TYPE>" +
+                                "<BELONGSTO> Yes </BELONGSTO>" +
+                                "<Filters> CompanyFilter </Filters>" +
+                                "</COLLECTION>" +
+                                "<COLLECTION NAME = \"Remote Collection 1\" ISINITIALIZE = \"Yes\">" +
+                                "<TYPE> Tax Unit </TYPE>" +
+                                "<NATIVEMETHOD> GSTREGNUMBER </NATIVEMETHOD>" +
+                                "</COLLECTION>" +
+                                "<COLLECTION NAME = \"Remote Collection 2\" ISINITIALIZE = \"Yes\">" +
+                                "<COLLECTIONS> Remote Collection 1:Remote Collection 0 </COLLECTIONS>" +
+                                "</COLLECTION>" +
+                                "<SYSTEM TYPE = \"Formulae\" NAME = \"CompanyFilter\" >$Name = '" + SecurityElement.Escape(companyName) + "' </SYSTEM>" +
+                                "</TDLMESSAGE></TDL>" +
+                                "</ DESC ></ BODY ></ ENVELOPE > ";
+
+            string ResponseXML = XMLRequest(RequestXML);
+            return ResponseXML;
+        }
+
+        internal string GetBankDetails(string companyName, DateTime fromDate, DateTime toDate, string voucherGuid, string fields)
+        {
+            string[] fieldList = fields.Split(',');
+
+            string RequestXML = "<ENVELOPE>" +
+                                "<HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+                                "<TYPE>COLLECTION</TYPE><ID>BankAllocationsCollection</ID></HEADER>" +
+                                "<BODY><DESC>" +
+                                "<STATICVARIABLES>" +
+                                "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+                                "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyName) + "</SVCURRENTCOMPANY>" +
+                                "<SVFROMDATE TYPE=\"Date\">" + fromDate.ToString("dd-MMM-yyyy") + "</SVFROMDATE>" +
+                                "<SVTODATE TYPE=\"Date\">" + toDate.ToString("dd-MMM-yyyy") + "</SVTODATE>" +
+                                "</STATICVARIABLES>" +
+                                "<TDL><TDLMESSAGE>" +
+                                "<COLLECTION NAME = \"VouchersCollection\" ISINITIALIZE=\"Yes\">" +
+                                "<TYPE>VOUCHERS</TYPE>" +
+                                "<BELONGSTO>Yes</BELONGSTO>" +
+                                "<CHILDOF>##SVCURRENTCOMPANY</CHILDOF>" +
+                                "</COLLECTION>" +
+                                "<COLLECTION NAME = \"BankAllocationsCollection\" ISINITIALIZE=\"Yes\">" +
+                                "<SOURCECOLLECTION>VouchersCollection</SOURCECOLLECTION>" +
+                                "<WALK>LedgerEntries, BankAllocations</WALK>" +
+                                "<METHOD>VoucherNo:$vouchernumber</METHOD>" +
+                                "<METHOD>VoucherDate:$Date</METHOD>" +
+                                "<METHOD>VoucherGuid:$guid</METHOD>" +
+                                "<METHOD>VoucherMasterId:$masterId</METHOD>" +
+                                "<METHOD>LedgerName: $.LedgerName</METHOD>";
+
+            foreach (string field in fieldList)
+                RequestXML += "<NATIVEMETHOD>" + field + "</NATIVEMETHOD>";
+
+            RequestXML += "<FILTERS>VoucherGuidFilter</FILTERS>" +
+                          "</COLLECTION>" +
+                          "<OBJECT NAME=\"Ledger Entry\" ISMODIFY=\"Yes\">" +
+                          "<LOCALFORMULA>LedgerMasterID:$MasterID:Ledger:$LedgerName</LOCALFORMULA>" +
+                          "</OBJECT>" +
+                          "<SYSTEM TYPE =\"Formulae\" NAME=\"VoucherGuidFilter\">$VoucherGuid = '" + SecurityElement.Escape(voucherGuid) + "'</SYSTEM>" +
+                          "</TDLMESSAGE></TDL>" +
+                          "</DESC></BODY></ENVELOPE>";
+
+            string ResponseXML = XMLRequest(RequestXML);
+            return ResponseXML;
+        }
+
+        internal string GetCustomerOutstanding(string companyName, DateTime toDate)
+        {
+            string RequestXML = "<ENVELOPE>" +
+                                "<HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+                                "<TYPE>COLLECTION</TYPE><ID>LedgerOutstandingCollection</ID></HEADER>" +
+                                "<BODY><DESC>" +
+                                "<STATICVARIABLES>" +
+                                "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+                                "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyName) + "</SVCURRENTCOMPANY>" +
+                                "<SVTODATE TYPE=\"Date\">" + toDate.ToString("dd-MMM-yyyy") + "</SVTODATE>" +
+                                "</STATICVARIABLES>" +
+                                "<TDL><TDLMESSAGE>" +
+                                "<COLLECTION NAME = \"LedgerOutstandingCollection\" ISINITIALIZE=\"Yes\">" +
+                                "<SOURCECOLLECTION>Ledger</SOURCECOLLECTION>" +
+                                "<METHOD>LedgerId:$MasterId</METHOD>" +
+                                "<METHOD>LedgerName:$Name</METHOD>" +
+                                "<METHOD>LedgerGuid:$Guid</METHOD>"+
+                                "<METHOD>LedgerGroup:$Parent</METHOD>" +
+                                "<METHOD>ClosingBalance:$ClosingBalance * -1</METHOD>" +
+                                "</COLLECTION>" +
+                                "</TDLMESSAGE></TDL>" +
+                                "</DESC></BODY></ENVELOPE>";
+
+            string ResponseXML = XMLRequest(RequestXML);
+            return ResponseXML;
+        }
+
+        internal string GetStock(string companyName, DateTime startDate, DateTime endDate, int masterId)
+        {
+            string requestXML = "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+                                "<TYPE>COLLECTION</TYPE><ID>STATVchType11</ID></HEADER><BODY><DESC>" +
+                                "<STATICVARIABLES>" +
+                                    "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+                                    "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyName) + @"</SVCURRENTCOMPANY>" +
+                                    "<SVFROMDATE TYPE=\"Date\">" + startDate.ToString("dd-MMM-yyyy") + @"</SVFROMDATE>" +
+                                    "<SVTODATE TYPE=\"Date\"> " + endDate.ToString("dd-MMM-yyyy") + @"</SVTODATE>" +
+                                " </STATICVARIABLES>" +
+                                "<TDL><TDLMESSAGE>" +
+                                "<COLLECTION NAME = \"STATVchType11\" ISINITIALIZE=\"Yes\">" +
+                                "<TYPE>Batch</TYPE>" +
+                                "<CHILDOF>@@StockItemFilteredName</CHILDOF>" +
+                                "<FILTERS></FILTERS>" +
+                                "<NATIVEMETHOD>Name</NATIVEMETHOD>" +
+                                "<NATIVEMETHOD>GodownName</NATIVEMETHOD>" +
+                                "<NATIVEMETHOD>ClosingBalance</NATIVEMETHOD>" +
+                                "<NATIVEMETHOD>ClosingValue</NATIVEMETHOD>" +
+                                "<NATIVEMETHOD>BatchName</NATIVEMETHOD>" +
+                                "</COLLECTION>" +
+                                "<COLLECTION NAME = \"StockItem11\" ISINITIALIZE=\"Yes\">" +
+                                "<TYPE>StockItem</TYPE>" +
+                                "<NATIVEMETHOD>Name</NATIVEMETHOD>" +
+                                "<FILTERS>MasterAlterID</FILTERS>" +
+                                "</COLLECTION>" +
+                                "<SYSTEM TYPE =\"Formulae\" NAME=\"MasterAlterID\">" +
+                                "$MasterID = " + masterId +
+                                "</SYSTEM>" +
+                                "<SYSTEM TYPE =\"Formulae\" NAME=\"StockItemFilteredName\">" +
+                                "$$CollectionField:$Name:1:StockItem11" +
+                                "</SYSTEM>" +
+                                "</TDLMESSAGE>" +
+                                "</TDL>" +
+                                "</DESC>" +
+                                "</BODY>" +
+                                "</ENVELOPE>";
+            string ResponseXML = XMLRequest(requestXML);
+            return ResponseXML;
+        }
+
+        internal string GetReceipts(string companyName, DateTime startVoucherDate, DateTime endVoucherDate, string fields)
+        {
+            string[] fieldList = fields.Split(',');
+
+            string RequestXML = "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>EXPORT</TALLYREQUEST>" +
+                "<TYPE>COLLECTION</TYPE>" +
+                "<ID>Remote Collection 2</ID>" +
+                "</HEADER>" +
+                "<BODY><DESC><STATICVARIABLES>" +
+                "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" +
+                "<SVCURRENTCOMPANY>" + SecurityElement.Escape(companyName) + "</SVCURRENTCOMPANY>" +
+                "<SVFROMDATE TYPE = \"Date\">" + startVoucherDate.ToString("dd-MMM-yyyy") + "</SVFROMDATE>" +
+                "<SVTODATE TYPE = \"Date\">" + endVoucherDate.ToString("dd-MMM-yyyy") + "</SVTODATE>" +
+                "</STATICVARIABLES>" +
+                "<TDL><TDLMESSAGE>" +
+                "<COLLECTION NAME = \"Remote Collection 1\" ISINITIALIZE =\"Yes\">" +
+                "<TYPE>VOUCHERS</TYPE>" +
+                "<BELONGSTO>Yes</BELONGSTO>" +
+                "<CHILDOF>##SVCURRENTCOMPANY</CHILDOF>" +
+                "</COLLECTION>" +
+                "<COLLECTION NAME = \"Remote Collection 2\" ISINITIALIZE = \"Yes\">" +
+                "<SOURCECOLLECTION>Remote Collection 1</SOURCECOLLECTION>";
+
+
+            foreach (string field in fieldList)
+                RequestXML += "<NATIVEMETHOD>" + field + "</NATIVEMETHOD>";
+
+            RequestXML += "<METHOD>IsReceipt: $$IsReceipt:$VoucherTypeName</METHOD>" +
+                          "<METHOD>VoucherMasterId:$masterId</METHOD>" +
+                          "<FILTERS>VoucherTypeFilter</FILTERS>" +
+                          "</COLLECTION>" +
+                          "<SYSTEM TYPE =\"Formulae\" NAME=\"VoucherTypeFilter\">$$IsReceipt:$VoucherTypeName</SYSTEM>" +
+                          "</TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>";
+
+            string ResponseXML = XMLRequest(RequestXML);
+            return ResponseXML;
+        }
+    }
+}

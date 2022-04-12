@@ -1,0 +1,43 @@
+﻿using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationBase.Common
+{
+   public static class ErrorLogger
+    {      
+        public static void LogError(Logger logger,string apiName, string message)
+        {
+            logger.Error("ImportWorker|" + Session.UserName + "|" +message);
+            logger.Error("ImportWorker|" + Session.UserName + "|" + "^");
+            try
+            {
+                if (message.Contains('\r') || message.Contains('\n'))
+                {
+                    string messageEdit = message.Replace('\r','.');
+                    messageEdit = message.Replace('\n', ' ');
+                    message = messageEdit;
+                }
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    ErrorLog errorLog = new ErrorLog();
+                    errorLog.API = apiName;
+                    errorLog.Message = message;
+                    errorLog.TimeStamp = DateTime.Now;
+                    uow.ErrorLog.Add(errorLog);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+                logger.Fatal("ImportWorker|" + Session.UserName + "|Error on creating error log in database" + "^");
+                logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+            }
+        }
+    }
+}

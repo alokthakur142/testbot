@@ -1,0 +1,349 @@
+﻿using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using OrchidDALBase;
+using System;
+using System.Drawing;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.IO;
+using System.Diagnostics;
+using BeatrouteTallyIntegration.Utils;
+using NLog;
+using BeatrouteTallyIntegrationBase.Helpers;
+
+namespace BeatrouteTallyIntegration.Controls
+{
+    public partial class ctrlSyncStatus : UserControl
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+
+        public ctrlSyncStatus()
+        {
+            InitializeComponent();
+            HideAllLabelFormElements();
+            
+        }
+
+        private void timerSyncStaus_Tick(object sender, EventArgs e)
+        {
+            LoadSyncStatusData();
+            LoadErrorStatusData();
+        }
+
+        private void HideAllLabelFormElements()
+        {
+            #region Sync Status Progress
+            lblOutstandingsStatus.Visible = false;
+            lblSalesInvoicesStatus.Visible = false;
+            lblSalesOrdersStatus.Visible = false;
+            lblSKUsStatus.Visible = false;
+            #endregion
+
+            #region Sync Error Progress
+            lblSalesOrdersError.Visible = false;
+            lblOutstandingsError.Visible = false;
+            lblSalesInvoicesError.Visible = false;
+            lblSKUsError.Visible = false;
+            #endregion
+
+            #region View log links
+            linkViewLogForOutstandings.Visible = false;
+            linkViewLogForSalesInvoices.Visible = false;
+            linkViewLogForSalesOrders.Visible = false;
+            linkViewLogForSKUs.Visible = false;
+            #endregion
+        }
+
+        private void ctrlSyncStatus_Load(object sender, EventArgs e)
+        {
+            LoadSyncStatusData();
+            LoadErrorStatusData();
+        }
+
+        private void LoadSyncStatusData()
+        {
+            using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+            {
+                #region Oustanding
+                lblOutstandingsStatus.Text = GetAndSetSyncStatusValue(uow, SyncStatusTextMessageHelper.Outstandings);
+                CustomiseStatusLabels(lblOutstandingsStatus);
+
+                #endregion
+
+                #region SKU(Item)
+                lblSKUsStatus.Text = GetAndSetSyncStatusValue(uow, SyncStatusTextMessageHelper.Skus);
+                CustomiseStatusLabels(lblSKUsStatus);
+                #endregion
+
+                #region Stock
+                lblStocksStatus.Text = GetAndSetSyncStatusValue(uow, SyncStatusTextMessageHelper.Stocks);
+                CustomiseStatusLabels(lblStocksStatus);
+                #endregion
+
+                #region Sales Invoice
+                lblSalesInvoicesStatus.Text = GetAndSetSyncStatusValue(uow, SyncStatusTextMessageHelper.SalesInvoices);
+                CustomiseStatusLabels(lblSalesInvoicesStatus);
+                #endregion
+
+                #region Sales Order
+                lblSalesOrdersStatus.Text = GetAndSetSyncStatusValue(uow, SyncStatusTextMessageHelper.SalesOrders);
+                CustomiseStatusLabels(lblSalesOrdersStatus);
+                #endregion
+            }
+        }
+
+        private void LoadErrorStatusData()
+        {
+            using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+            {
+                #region Customer Error
+                lblOutstandingsError.Text = GetErrorStatus(uow, SyncStatusTextMessageHelper.Outstandings);
+                CustomiseErrorLabels(lblOutstandingsError, linkViewLogForOutstandings);
+                #endregion
+
+                #region Item Error
+                lblSKUsError.Text = GetErrorStatus(uow, SyncStatusTextMessageHelper.Skus);
+                CustomiseErrorLabels(lblSKUsError, linkViewLogForSKUs);
+                #endregion
+
+                #region Stock Error
+                lblStocksError.Text = GetErrorStatus(uow, SyncStatusTextMessageHelper.Stocks);
+                CustomiseErrorLabels(lblStocksError, linkViewLogForStocks);
+                #endregion
+
+                #region Sales Invoice Error
+                lblSalesInvoicesError.Text = GetErrorStatus(uow, SyncStatusTextMessageHelper.SalesInvoices);
+                CustomiseErrorLabels(lblSalesInvoicesError, linkViewLogForSalesInvoices);
+                #endregion
+
+                #region Sales Order Error
+                lblSalesOrdersError.Text = GetErrorStatus(uow, SyncStatusTextMessageHelper.SalesOrders);
+                CustomiseErrorLabels(lblSalesOrdersError, linkViewLogForSalesOrders);
+                #endregion
+            }
+        }
+
+        private string GetAndSetSyncStatusValue(UnitOfWork uow, string ledgerKey)
+        {
+            SyncStatus syncStatus = uow.SyncStatus.GetList().Where(x => x.LedgerKey == ledgerKey).FirstOrDefault();
+            if (syncStatus == null)
+            {
+                syncStatus = new SyncStatus();
+                syncStatus.LedgerKey = ledgerKey;
+                syncStatus.LedgerValue = SyncStatusTextMessageHelper.Idle;
+                syncStatus.LedgerErrorStatus = "";
+
+                uow.SyncStatus.Add(syncStatus);
+
+                return syncStatus.LedgerValue;
+            }
+            else
+                return syncStatus.LedgerValue;
+        }
+
+        private string GetErrorStatus(UnitOfWork uow, string ledgerKey)
+        {
+            SyncStatus syncStatus = uow.SyncStatus.GetList().Where(x => x.LedgerKey == ledgerKey).FirstOrDefault();
+            if (syncStatus != null)
+            {
+                return syncStatus.LedgerErrorStatus;
+            }
+            return null;
+        }
+
+        private void CustomiseStatusLabels(Label label)
+        {
+            if (label.Text == SyncStatusTextMessageHelper.Idle)
+            {
+                label.Visible = true;
+                label.ForeColor = Color.DimGray;
+            }
+            #region For Data sync from tally
+            else if (label.Text == SyncStatusTextMessageHelper.TallyDataSyncProgress)
+            {
+                label.Visible = true;
+                label.ForeColor = Color.Gray;
+            }
+            else if (label.Text == SyncStatusTextMessageHelper.TallyDataSyncWithError)
+            {
+                label.Visible = true;
+                label.ForeColor = Color.Orange;
+            }
+            else if (label.Text == SyncStatusTextMessageHelper.TallyDataSyncWithoutError)
+            {
+                label.Visible = true;
+                label.ForeColor = Color.Green;
+            }
+            #endregion
+
+            #region For Data posting to beatroute
+            else if (label.Text == SyncStatusTextMessageHelper.TallyDataPostProgress)
+            {
+                label.Visible = true;
+                label.ForeColor = Color.Gray;
+            }
+            else if (label.Text == SyncStatusTextMessageHelper.TallyDataPostWithError)
+            {
+                label.Visible = true;
+                label.ForeColor = Color.Orange;
+            }
+            else if (label.Text == SyncStatusTextMessageHelper.TallyDataPostWithoutError)
+            {
+                label.Visible = true;
+                label.ForeColor = Color.Green;
+            }
+            #endregion
+
+            #region For Sales Order syncing from beatroute
+            else if (label.Text == SyncStatusTextMessageHelper.SalesOrderSyncProgress)
+            {
+                label.Visible = true;
+                label.ForeColor = Color.Gray;
+            }
+            else if (label.Text == SyncStatusTextMessageHelper.SalesOrderPostWithError)
+            {
+                label.Visible = true;
+                label.ForeColor = Color.Orange;
+            }
+            else if (label.Text == SyncStatusTextMessageHelper.SalesOrderSyncWithoutError)
+            {
+                label.Visible = true;
+                label.ForeColor = Color.Green;
+            }
+            #endregion
+
+            #region For Sales Order posting to tally
+            else if (label.Text == SyncStatusTextMessageHelper.SalesOrderPostProgress)
+            {
+                label.Visible = true;
+                label.ForeColor = Color.Gray;
+            }
+            else if (label.Text == SyncStatusTextMessageHelper.SalesOrderPostWithError)
+            {
+                label.Visible = true;
+                label.ForeColor = Color.Orange;
+            }
+            else if (label.Text == SyncStatusTextMessageHelper.SalesOrderPostWithoutError)
+            {
+                label.Visible = true;
+                label.ForeColor = Color.Green;
+            }
+            #endregion
+        }
+
+        private void CustomiseErrorLabels(Label errorLabel, LinkLabel viewLinkLabel)
+        {
+            if (errorLabel.Text.Contains("Error") || errorLabel.Text.Contains("Errors"))
+            {
+                errorLabel.Visible = true;
+                errorLabel.ForeColor = Color.Red;
+                viewLinkLabel.Visible = true;                
+            }
+            else
+            {
+                errorLabel.Visible = false;
+                viewLinkLabel.Visible = false;
+            }
+        }
+
+        private void commonLinkLabel_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            try
+            {
+                LinkLabel linkLabel = sender as LinkLabel;
+                var linkLabelName = linkLabel.Name;
+
+                #region Outstandings
+                if (linkLabelName.Contains("linkViewLogForOutstandings"))
+                {
+                    string directoryPath = Path.GetFullPath(Path.Combine(Application.CommonAppDataPath, @"..\..\"));
+                    string filePath = Path.Combine(directoryPath, "Logs\\OutstandingLog.txt");
+                    if (File.Exists(filePath))
+                    {
+                        Process.Start(filePath);
+                    }
+                    else
+                    {
+                        MessagePopup.ShowWarning(string.Format("File doesn't exist on path - {0}.Please contact beatroute support", filePath));
+                    }
+                }
+                #endregion
+
+                #region SKUs
+                else if (linkLabelName.Contains("linkViewLogForSKUs"))
+                {
+                    string directoryPath = Path.GetFullPath(Path.Combine(Application.CommonAppDataPath, @"..\..\"));
+                    string filePath = Path.Combine(directoryPath, "Logs\\SKULog.txt");
+                    if (File.Exists(filePath))
+                    {
+                        Process.Start(filePath);
+                    }
+                    else
+                    {
+                        MessagePopup.ShowWarning(string.Format("File doesn't exist on path - {0}.Please contact beatroute support", filePath));
+                    }
+                }
+                #endregion
+
+                #region Stocks
+                else if (linkLabelName.Contains("linkViewLogForStocks"))
+                {
+                    string directoryPath = Path.GetFullPath(Path.Combine(Application.CommonAppDataPath, @"..\..\"));
+                    string filePath = Path.Combine(directoryPath, "Logs\\StockLog.txt");
+                    if (File.Exists(filePath))
+                    {
+                        Process.Start(filePath);
+                    }
+                    else
+                    {
+                        MessagePopup.ShowWarning(string.Format("File doesn't exist on path - {0}.Please contact beatroute support", filePath));
+                    }
+                }
+                #endregion
+
+                #region Sales Invoices
+                else if (linkLabelName.Contains("linkViewLogForSalesInvoices"))
+                {
+                    string directoryPath = Path.GetFullPath(Path.Combine(Application.CommonAppDataPath, @"..\..\"));
+                    string filePath = Path.Combine(directoryPath, "Logs\\SalesInvoiceLog.txt");
+                    if (File.Exists(filePath))
+                    {
+                        Process.Start(filePath);
+                    }
+                    else
+                    {
+                        MessagePopup.ShowWarning(string.Format("File doesn't exist on path - {0}.Please contact beatroute support", filePath));
+                    }
+                }
+                #endregion
+
+                #region Sales Orders
+                else if (linkLabelName.Contains("linkViewLogForSalesOrder"))
+                {
+                    string directoryPath = Path.GetFullPath(Path.Combine(Application.CommonAppDataPath, @"..\..\"));
+                    string filePath = Path.Combine(directoryPath, "Logs\\SalesOrderLog.txt");
+                    if (File.Exists(filePath))
+                    {
+                        Process.Start(filePath);
+                    }
+                    else
+                    {
+                        MessagePopup.ShowWarning(string.Format("File doesn't exist on path - {0}.Please contact beatroute support", filePath));
+                    }
+                } 
+                #endregion
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+    }
+}

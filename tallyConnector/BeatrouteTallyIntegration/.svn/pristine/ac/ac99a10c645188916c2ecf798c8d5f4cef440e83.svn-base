@@ -1,0 +1,313 @@
+﻿using BeatrouteTallyIntegrationBase.API;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Dynamic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Security;
+using System.Reflection;
+using System.Text;
+using System.Threading.Tasks;
+using static BeatrouteTallyIntegrationBase.Utils.Enum;
+
+namespace BeatrouteTallyIntegration.Utils
+{
+    public class ConnectionCheckHelper
+    {
+        private static Logger _logger = LogManager.GetLogger("ApiLog");
+        private static ApiCall _apiCall;
+        private static string _windowsModel = string.Empty;
+        public static bool GetToken(string userName, string password, string url)
+        {
+            try
+            {
+                //Biplab Sharma - 21-03-2022 - Modifed the reading process by usinga separated helper class
+                #region Reading Windows Version
+
+                #region Old code - moved code in utils folder
+                //string subKey = @"SOFTWARE\Wow6432Node\Microsoft\Windows NT\CurrentVersion";
+                //Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine;
+                //Microsoft.Win32.RegistryKey skey = key.OpenSubKey(subKey);
+                //string windowsName = skey.GetValue("ProductName").ToString();
+
+                //if (windowsName == null)
+                //    windowsName = ""; 
+                #endregion
+
+                try
+                {
+                    _windowsModel = OSInfo.Name + " - " + OSInfo.Edition;
+                }
+                catch (Exception ex)
+                {
+                    _windowsModel = "ERROR";
+
+                    _logger.Fatal("Exception at reading windows version");
+                    _logger.Fatal("");
+                    _logger.Fatal(ex);
+                    _logger.Fatal("");
+                }
+
+                _logger.Info("Generating dynamic objects for passing the values to Api");
+                _logger.Info("");
+                dynamic requestBody = new ExpandoObject();
+                requestBody.username = userName;
+                _logger.Info("User name is : " + userName);
+                _logger.Info("");
+                requestBody.password = password;
+                requestBody.device = "tally";
+                _logger.Info("Device model : " + _windowsModel);
+                _logger.Info("");
+                requestBody.device_model = _windowsModel;
+                _logger.Info("Application version number : " + Session.VersionNo);
+                _logger.Info("");
+                requestBody.ver = Session.VersionNo;
+
+                _apiCall = new ApiCall();
+                _apiCall.TimeStamp = DateTime.Now;
+                _logger.Info("Request time : " + _apiCall.TimeStamp);
+                _logger.Info("");
+                _apiCall.Api = "Token";
+                _logger.Info("Request type : " + _apiCall.Api);
+                _logger.Info("");
+                _logger.Info("Starting GetResponse method to get the response from the API");
+                _logger.Info("");
+                ApiResponse apiResponse = GetResponse(RequestType.POST.ToString(), requestBody, url, true);
+                _logger.Info("GetResponse method has completed");
+                _logger.Info("");
+                apiResponse.Timestamp = _apiCall.TimeStamp;
+
+                if (string.IsNullOrEmpty(apiResponse.Response) || string.IsNullOrWhiteSpace(apiResponse.Response))
+                {
+                    _logger.Info("ApiResponse is null.Returing false");
+                    _logger.Info("");
+                    return false;
+                }
+                _logger.Info("Reading JSON objects from the api response");
+                _logger.Info("");
+                JObject jsonObject = JObject.Parse(apiResponse.Response);
+                string token = string.Empty;
+
+                if (jsonObject != null)
+                {
+                    if (Convert.ToBoolean(jsonObject["success"]) == true)
+                    {
+                        token = jsonObject["token"].ToString().Trim();
+                        _logger.Info("Token found returning true");
+                        _logger.Info("");
+                        return true;
+                    }
+                    else
+                    {
+                        _logger.Info("Token not found returning false");
+                        _logger.Info("");
+                        return false;
+                    }
+
+                }
+                _logger.Info("Returing false");
+                _logger.Info("");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("There is an exception in GetToken method");
+                _logger.Fatal("");
+                _logger.Fatal("The exception is : " + ex.Message);
+                _logger.Fatal("");
+
+                _logger.Fatal("The exception source : " + ex.Source);
+                _logger.Fatal("");
+
+                _logger.Fatal("The exception data : " + ex.Data);
+                _logger.Fatal("");
+
+                _logger.Fatal("The inner exception of the web exception is : " + ex.InnerException);
+                _logger.Fatal("");
+
+                _logger.Fatal("Stack Trace : " + ex.StackTrace);
+                _logger.Fatal("");
+
+                _logger.Fatal("Returning false");
+                _logger.Fatal("");
+                return false;
+            }
+        }
+
+        private static ApiResponse GetResponse(string method, object requestBody, string url, bool isToken = false)
+        {
+            _logger.Info("GetResponse method has started");
+            _logger.Info("");
+
+            _logger.Info("Method is : " + method);
+            _logger.Info("");
+
+            _logger.Info("Base Url : " + url);
+            _logger.Info("");
+
+            _logger.Info("Token Status : " + isToken);
+            _logger.Info("");
+
+            ServicePointManager.Expect100Continue = true;
+            _logger.Info("ServicePointManager.Expect100Continue = true");
+            _logger.Info("");
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            _logger.Info("Security Protocol is : TLS1.2");
+            _logger.Info("");
+            HttpWebResponse response = null;
+            ApiResponse apiResponse = new ApiResponse();
+            try
+            {
+                string body = string.Empty;
+                if (requestBody != null)
+                {
+                    body = JsonConvert.SerializeObject(requestBody, Formatting.Indented);
+                }
+                _logger.Info("Serialize jSON body : " + body);
+                _logger.Info("");
+
+                _logger.Info("Creating HttpWebRequest");
+                _logger.Info("");
+                var webReq = (HttpWebRequest)WebRequest.Create(url);
+                _logger.Info("WebRequest has created");
+                _logger.Info("");
+
+                webReq.Method = method;
+                _logger.Info("WebRequest Method is : " + method);
+                _logger.Info("");
+
+                webReq.Accept = "*/*";
+                _logger.Info("WebRequest AcceptType : " + webReq.Accept);
+                _logger.Info("");
+
+                webReq.ContentType = "application/json";
+                _logger.Info("WebRequest ContentType : " + webReq.ContentType);
+                _logger.Info("");
+
+                webReq.UserAgent = "BeatrouteTallyConnector";
+                _logger.Info("WebRequest UserAgent : " + webReq.UserAgent);
+                _logger.Info("");
+
+                _logger.Info("Converting JSON-body into byte array");
+                _logger.Info("");
+                byte[] bytes = Encoding.ASCII.GetBytes(body);
+                _logger.Info("Converted byte array : " + bytes);
+                _logger.Info("");
+
+
+                webReq.ContentLength = bytes.Length;
+                _logger.Info("WebRequest ContentLength: " + webReq.ContentLength);
+                _logger.Info("");
+
+                _logger.Info("Getting the stream request from the web request property");
+                _logger.Info("");
+                using (var os = webReq.GetRequestStream())
+                {
+                    _logger.Info("Writing the byte array to the web request");
+                    _logger.Info("");
+                    os.Write(bytes, 0, bytes.Length);
+
+                    _logger.Info("Operation completed");
+                    _logger.Info("");
+                    os.Close();
+                }
+
+                _logger.Info("Getting response from the HttpWebResponse");
+                _logger.Info("");
+                response = (HttpWebResponse)webReq.GetResponse();
+
+                apiResponse.ResponseCode = response.StatusCode.ToString();
+                _logger.Info("Response status code : "+response.StatusCode);
+                _logger.Info("");
+                if (response == null)
+                {
+                    _logger.Info("Response is null. Returning as null object");
+                    _logger.Info("");
+                    return null;
+                }
+
+                _logger.Info("Response is not null");
+                _logger.Info("");
+                _logger.Info("Reading the response stream");
+                _logger.Info("");
+                var streamReader = new StreamReader(response.GetResponseStream());
+                var responseContent = streamReader.ReadToEnd().Trim();
+                _logger.Info("Response content : "+ responseContent);
+                _logger.Info("");
+
+                apiResponse.Response = responseContent;
+                apiResponse.ExceptionMessage = "";
+            }
+            catch (WebException webEx)
+            {
+                _logger.Fatal("There is an web exception in GetReponse method");
+                _logger.Fatal("");
+
+                _logger.Fatal("The exception is : " + webEx.Message);
+                _logger.Fatal("");
+
+                _logger.Fatal("The exception status is : " + webEx.Status);
+                _logger.Fatal("");
+
+                _logger.Fatal("The exception source : " + webEx.Source);
+                _logger.Fatal("");
+
+                _logger.Fatal("The exception response : " + webEx.Response);
+                _logger.Fatal("");
+
+                _logger.Fatal("The exception data : " + webEx.Data);
+                _logger.Fatal("");
+
+                _logger.Fatal("The inner exception of the web exception is : " + webEx.InnerException);
+                _logger.Fatal("");
+
+                _apiCall.Response += webEx.Message;
+                _apiCall.ResponseCode = webEx.Status.ToString();
+                apiResponse.ResponseCode = webEx.Status.ToString();
+                apiResponse.ExceptionMessage = webEx.Message;
+                apiResponse.Timestamp = _apiCall.TimeStamp;
+
+                return apiResponse;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("There is an exception in GetReponse method");
+                _logger.Fatal("");
+
+                _logger.Fatal("The exception is : " + ex.Message);
+                _logger.Fatal("");
+
+                _logger.Fatal("The exception source : " + ex.Source);
+                _logger.Fatal("");
+
+                _logger.Fatal("The exception data : " + ex.Data);
+                _logger.Fatal("");
+
+                _logger.Fatal("The inner exception of the web exception is : " + ex.InnerException);
+                _logger.Fatal("");
+
+                _logger.Fatal("Stack Trace : " + ex.StackTrace);
+                _logger.Fatal("");
+
+                _apiCall.Response += ex.Message;
+                _apiCall.ResponseCode = "0";
+
+                apiResponse.ResponseCode = "0";
+                apiResponse.ExceptionMessage = ex.Message;
+                apiResponse.Timestamp = _apiCall.TimeStamp;
+
+                return apiResponse;
+            }
+            return apiResponse;
+
+        }
+    }
+}
+#endregion

@@ -1,0 +1,31 @@
+﻿using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.Models
+{
+    [ModelAttributes(Key = "Id", TableName = "CustomerOrderItemLines")]
+    public class CustomerOrderItemLines
+    {
+        public Guid Id { get; set; }
+
+        public string OrderId { get; set; }
+
+        public string ItemId { get; set; }
+
+        public string ItemName { get; set; }
+        public string CompanyId { get; set; }
+
+        public decimal Qty { get; set; }
+
+        public decimal Rate { get; set; }
+
+        public decimal Amount { get; set; }
+
+        public DateTime DueDate { get; set; }
+        public string Guid { get; set; }
+    }
+}

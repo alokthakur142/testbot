@@ -1,0 +1,20 @@
+﻿using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.Models
+{
+    [ModelAttributes(Key = "Id", TableName = "Settings")]
+    public class Settings
+    {
+        public Guid Id { get; set; }
+
+        public string Key { get; set; }
+
+        public string Value { get; set; }
+       
+    }
+}

@@ -1,0 +1,448 @@
+﻿using BeatrouteTallyIntegration.Controls;
+using BeatrouteTallyIntegration.Database.Scripts;
+using BeatrouteTallyIntegration.Forms;
+using BeatrouteTallyIntegration.Utils;
+using BeatrouteTallyIntegrationBase.API;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationBase.Helpers;
+using BeatrouteTallyIntegrationBase.Utils;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.QueryHelperMethods;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using Microsoft.Win32;
+using NLog;
+using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Configuration;
+using System.Data;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Security.AccessControl;
+using System.Security.Principal;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Xml;
+using static BeatrouteTallyIntegrationBase.Utils.Enum;
+
+namespace BeatrouteTallyIntegration
+{
+    public partial class MainForm : Form
+    {
+        #region Global variables
+
+        private static Logger _logger = LogManager.GetLogger("AppLog");        
+        Login login = new Login();        
+        private int count = 1;        
+
+        //This will be updated on the new exe
+        
+
+        // The path to the key where Windows looks for startup applications
+        RegistryKey rkApp = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
+
+        #region Button Click Varibales
+        bool Home = false;
+        bool Settings = false;
+        bool SyncStatus = false;
+        bool Company = false;
+        bool HelpNSupport = false; 
+        #endregion
+
+        #endregion
+
+        public MainForm()
+        {
+            InitializeComponent();
+
+            rkApp.SetValue("BeatrouteTallyIntegration", Application.ExecutablePath);
+        }
+
+        #region Form Events
+
+        private void MainForm_Load(object sender, EventArgs e)
+        {
+
+            SetNotifyIcon();
+            _logger.Info("ImportWorker|" + Session.UserName + "|Starting application.." + "^");
+            _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+            //Create db in ProgramData                      
+
+            Session.ConnectionString = UnitOfWork.GetConnectionString();
+            LoadDashBoard();
+
+            Session.BaseUrl = Session.GetBaseUrl();
+            _logger.Debug("ImportWorker|" + Session.UserName + "|Base URL - " + Session.BaseUrl + "^");
+            _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+            RefreshLoginStatus();
+            //Subhabrata 16-Aug-2021 : Delete logs older than 7 days
+            DeleteLogs();
+        }
+
+        private void LoadDashBoard()
+        {
+            ClearControl();
+            userControlPanel.Padding = new Padding(0, 70, 0, 0);
+            ctrlDashboard control = new ctrlDashboard();
+            userControlPanel.Controls.Add(control);
+            control.Dock = DockStyle.Fill;
+            Home = true;
+            Company = Settings = SyncStatus = HelpNSupport = false;
+            UpdateButtonColor(Home, Company, Settings, SyncStatus, HelpNSupport);
+        }
+
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (e.CloseReason == CloseReason.UserClosing)
+            {
+                e.Cancel = true;
+                this.Visible = false;
+            }
+        }
+
+        #endregion
+
+        #region Button Events
+
+        private void btnDashboard_Click(object sender, EventArgs e)
+        {
+            #region Old Code commented out 
+            //ClearControl();
+            //userControlPanel.Padding = new Padding(0, 35, 0, 0);
+            //ctrlDashboard control = new ctrlDashboard();
+            //userControlPanel.Controls.Add(control);
+            //control.Dock = DockStyle.Fill;
+            //Home = true;
+            //Company = Settings = SyncStatus = HelpNSupport = false;
+            //UpdateButtonColor(Home, Company, Settings, SyncStatus, HelpNSupport); 
+            #endregion
+
+            LoadDashBoard();
+        }
+
+        private void UpdateButtonColor(bool home, bool company, bool settings, bool syncStaus, bool helpNSupport)
+        {
+            if (home)
+            {
+                btnDashboard.BackColor = Color.LightGray;
+                btnDashboard.Font = new Font(btnDashboard.Font, FontStyle.Bold);
+                btnCompanies.BackColor = btnSettings.BackColor = btnSyncStatus.BackColor = btnHelpAndSupport.BackColor = Color.White;
+                btnCompanies.Font = btnSettings.Font = btnSyncStatus.Font = btnHelpAndSupport.Font = new Font(btnDashboard.Font, FontStyle.Regular);
+            }
+            else if (company)
+            {
+                btnCompanies.BackColor = Color.LightGray;
+                btnCompanies.Font = new Font(btnCompanies.Font, FontStyle.Bold);
+                btnDashboard.BackColor = btnSettings.BackColor = btnSyncStatus.BackColor = btnHelpAndSupport.BackColor = Color.White;
+                btnDashboard.Font = btnSettings.Font = btnSyncStatus.Font = btnHelpAndSupport.Font = new Font(btnCompanies.Font, FontStyle.Regular);
+            }
+            else if (settings)
+            {
+                btnSettings.BackColor = Color.LightGray;
+                btnSettings.Font = new Font(btnSettings.Font, FontStyle.Bold);
+                btnCompanies.BackColor = btnDashboard.BackColor = btnSyncStatus.BackColor = btnHelpAndSupport.BackColor = Color.White;
+                btnCompanies.Font = btnDashboard.Font = btnSyncStatus.Font = btnHelpAndSupport.Font = new Font(btnSettings.Font, FontStyle.Regular);
+            }
+            else if (syncStaus)
+            {
+                btnSyncStatus.BackColor = Color.LightGray;
+                btnSyncStatus.Font = new Font(btnSyncStatus.Font, FontStyle.Bold);
+                btnCompanies.BackColor = btnDashboard.BackColor = btnSettings.BackColor = btnHelpAndSupport.BackColor = Color.White;
+                btnCompanies.Font = btnDashboard.Font = btnSettings.Font = btnHelpAndSupport.Font = new Font(btnSyncStatus.Font, FontStyle.Regular);
+            }
+            else if(helpNSupport)
+            {
+                btnHelpAndSupport.BackColor = Color.LightGray;
+                btnHelpAndSupport.Font = new Font(btnHelpAndSupport.Font, FontStyle.Bold);
+                btnCompanies.BackColor = btnDashboard.BackColor = btnSyncStatus.BackColor = btnSettings.BackColor = Color.White;
+                btnCompanies.Font = btnDashboard.Font = btnSyncStatus.Font = btnSettings.Font = new Font(btnHelpAndSupport.Font, FontStyle.Regular);
+            }
+        }
+
+        private void btnSettings_Click(object sender, EventArgs e)
+        {
+            ClearControl();
+            userControlPanel.Padding = new Padding(0, 70, 0, 0);
+            ctrlSettings control = new ctrlSettings();
+            userControlPanel.Controls.Add(control);
+            control.Dock = DockStyle.Fill;
+            Settings = true;
+            Company = Home = SyncStatus = HelpNSupport = false;
+            UpdateButtonColor(Home, Company, Settings, SyncStatus, HelpNSupport);
+        }
+
+        private void btnSyncStatus_Click(object sender, EventArgs e)
+        {
+            ClearControl();
+            userControlPanel.Padding = new Padding(0, 70, 0, 0);
+            ctrlSyncStatus control = new ctrlSyncStatus();
+            //control.RefreshGrid();
+            userControlPanel.Controls.Add(control);
+            control.Dock = DockStyle.Fill;
+            SyncStatus = true;
+            Company = Home = Settings = HelpNSupport = false;
+            UpdateButtonColor(Home, Company, Settings, SyncStatus, HelpNSupport);
+        }
+
+        private void btnCompanies_Click(object sender, EventArgs e)
+        {
+            ClearControl();
+            userControlPanel.Padding = new Padding(0, 70, 0, 0);
+            ctrlCompanies control = new ctrlCompanies();
+            control.RefreshGrid();
+            userControlPanel.Controls.Add(control);
+            control.Dock = DockStyle.Fill;
+            Company = true;
+            Settings = Home = SyncStatus = HelpNSupport = false;
+            UpdateButtonColor(Home, Company, Settings, SyncStatus, HelpNSupport);
+        }
+
+        private void roundButton1_Click(object sender, EventArgs e)
+        {
+            count++;
+            string loginImage = System.IO.Path.GetDirectoryName(Application.ExecutablePath) + @"\Resources\LoginPic.png";
+            string logoutImage = System.IO.Path.GetDirectoryName(Application.ExecutablePath) + @"\Resources\LogoutPic.png";
+            string[] rangeArray = { "Login", "Logout" };
+            if (count % 2 == 0)
+            {
+                LoginComboBox.Visible = true;
+                foreach (var item in rangeArray)
+                {
+                    LoginComboBox.Items.Add(item);
+                }
+                if (!string.IsNullOrEmpty(lblUserName.Text) && (lblUserName.Text != "User is not logged in"))
+                {
+                    LoginComboBox.SelectedItem = LoginComboBox.Items[1];
+                }
+                else
+                {
+                    LoginComboBox.SelectedItem = LoginComboBox.Items[0];
+
+                }
+            }
+            else
+            {
+                LoginComboBox.Visible = false;
+            }
+        }
+
+        private void btnHelpAndSupport_Click(object sender, EventArgs e)
+        {
+            //WebBrowser browser = new WebBrowser();
+            //browser.DocumentText = System.IO.Path.GetDirectoryName(Application.ExecutablePath) + @"\FreshChat\FreshChatPage.html";
+            //browser.Document.InvokeScript()
+            ClearControl();
+            userControlPanel.Padding = new Padding(0, 70, 0, 0);
+            ctrlHelpAndSupport control = new ctrlHelpAndSupport();
+            userControlPanel.Controls.Add(control);
+            control.Dock = DockStyle.Fill;
+            HelpNSupport = true;
+            Company = Home = SyncStatus = Settings = false;
+            UpdateButtonColor(Home, Company, Settings, SyncStatus, HelpNSupport);
+        }
+
+        private void LoginComboBox_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                string loginImage = System.IO.Path.GetDirectoryName(Application.ExecutablePath) + @"\Resources\LoginPic.png";
+                string logoutImage = System.IO.Path.GetDirectoryName(Application.ExecutablePath) + @"\Resources\LogoutPic.png";
+                if (LoginComboBox.SelectedItem.ToString() == "Logout")
+                {
+                    bool result = MessagePopup.AskConfirmation("Do you want to Logout ?");
+                    if (result)
+                    {
+                        using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                        {
+                            Login logoutUser = uow.Login.GetList().Where(x => x.UserName == lblUserName.Text).FirstOrDefault();                                                        
+
+                            uow.Login.Delete(logoutUser.Id);
+                           
+                        }
+
+                        MessagePopup.ShowMessage("You have been logged out successfully");
+                        lblUserName.Text = "User is not logged in";
+                        frmLogin frmLogin = new Forms.frmLogin();
+                        frmLogin.ShowDialog();
+                        if (frmLogin.DialogResult == DialogResult.OK)
+                        {
+
+                            lblUserName.Text = frmLogin._userName;
+                            pictureBoxLogin.Image = Image.FromFile(logoutImage);
+                        }
+                        else
+                        {
+
+                            lblUserName.Text = "User is not logged in";
+                            pictureBoxLogin.Image = Image.FromFile(loginImage);
+                        }
+
+                    }
+                    count = 1;
+                }
+                else
+                {
+                    frmLogin frmLogin = new Forms.frmLogin(true);
+                    frmLogin.ShowDialog();
+                    if (frmLogin.DialogResult == DialogResult.OK)
+                    {
+
+                        lblUserName.Text = frmLogin._userName;
+                        pictureBoxLogin.Image = Image.FromFile(logoutImage);
+                    }
+                    else
+                    {
+
+                        lblUserName.Text = "User is not logged in";
+                        pictureBoxLogin.Image = Image.FromFile(loginImage);
+                    }
+                    count = 1;
+                }
+                LoginComboBox.Visible = false;
+
+            }
+            catch (Exception ex)
+            {
+
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+
+        #endregion
+
+        #region Notify Icon
+
+        private void SetNotifyIcon()
+        {
+            notifyIcon2 = new System.Windows.Forms.NotifyIcon(this.components);
+            notifyIcon2.Icon = this.Icon;
+            notifyIcon2.Text = "BeatRoute Tally Connector";
+            notifyIcon2.Visible = true;
+
+            notifyIcon2.ContextMenuStrip = contextMenuStrip1;
+
+            //this.Hide();
+        }
+
+        private void toolStripMenuItemShowApp_Click(object sender, EventArgs e)
+        {
+            this.Show();
+        }
+
+        private void quitToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            bool ask = MessagePopup.AskConfirmation("Are you sure you want to quit the application ?");
+            if (ask)
+                Application.Exit();
+        }
+
+        #endregion
+
+        #region Helper methods
+
+        
+        private void RefreshLoginStatus()
+        {
+            using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+            {
+                Login loginUser = uow.Login.GetList().FirstOrDefault();
+
+                //if (loginUser != null)
+                //{
+                //    bool login = RestUtility.GetToken(loginUser.UserName, StringFunctions.Decrypt(loginUser.Password), Session.BaseUrl + ApiType.login.ToString());
+                //}
+                //if (loginUser == null && string.IsNullOrEmpty(Session.Token))
+                //{
+                //    lblUsername.Text = "Username is not set. Please login";
+                //    btnLoginLogout.Text = "Login";
+                //}
+                string loginImage = Path.GetDirectoryName(Application.ExecutablePath) + @"\Resources\LoginPic.png";
+                string logoutImage = Path.GetDirectoryName(Application.ExecutablePath) + @"\Resources\LogoutPic.png";
+                if (loginUser == null /*|| loginUser != null && string.IsNullOrEmpty(Session.Token)*/)
+                {
+                    frmLogin frm = new frmLogin();
+                    frm.ShowDialog();
+                    frm.ShowIcon = true;
+                    if (frm.DialogResult == DialogResult.OK)
+                    {
+                        string secret = frm._userName;
+                        loginUser = uow.Login.GetList().Where(x => x.UserName == secret).FirstOrDefault();
+                        lblUserName.Text = loginUser.UserName;
+
+                        //LoginComboBox.SelectedItem = "Logout";
+                        pictureBoxLogin.Image = Image.FromFile(logoutImage);
+                    }
+                    else
+                    {
+                        lblUserName.Text = "Username is not set. Please login";
+
+                        //LoginComboBox.SelectedItem = "Login";
+                        pictureBoxLogin.Image = Image.FromFile(loginImage);
+                        this.Close();
+                        Application.Exit();
+                    }
+                }
+                else if (loginUser != null)
+                {
+                    lblUserName.Text = loginUser.UserName;
+                    Session.Token = loginUser.Token;
+                    //LoginComboBox.SelectedItem = "Logout";
+                    Session.UserName = loginUser.UserName;
+                }
+            }
+        }                     
+        private void DeleteLogs()
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                {
+                    var logsList = uow.ErrorLog.GetList().Where(x => x.TimeStamp.Date < DateTime.Now.Date.AddDays(-7)).ToList();
+                    foreach (ErrorLog log in logsList)
+                    {
+                        uow.ErrorLog.Delete(log.Id);
+                    }
+                }
+                _logger.Debug("ImportWorker|" + Session.UserName + "|Logs older than 7 days are deleted" + "^");
+                _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+        private void ClearControl()
+        {
+            if (userControlPanel.Controls.Count > 0)
+            {
+                Control currentControl = userControlPanel.Controls[0];
+                currentControl.Dispose();
+            }
+            userControlPanel.Controls.Clear();
+        }
+        protected override bool ProcessDialogKey(Keys keyData)
+        {
+            if (keyData == (Keys.Control | Keys.L))
+            {
+                DatabaseDataViewer databaseDataViewer = new DatabaseDataViewer();
+                databaseDataViewer.Show();
+                return true;
+            }
+            return base.ProcessDialogKey(keyData);
+        }
+
+
+
+        #endregion
+
+        
+    }
+}

@@ -1,0 +1,344 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Xml;
+
+namespace BeatrouteTallyIntegrationBase.Tally
+{
+    public class TallyAmount
+    {
+        public string ForeignCurrency { get; set; }
+        public decimal Rate { get; set; }
+        public decimal BaseCurrencyAmount { get; set; }
+        public decimal ForeignCurrencyAmount { get; set; }
+    }
+
+    public class TallyQuantity
+    {
+        public decimal Quantity { get; set; }
+        public string UOM { get; set; }
+        public decimal AlternateQuantity { get; set; }
+        public string AlternateUOM { get; set; }
+        public string QuantityString { get; set; }
+
+    }
+
+    public class TallyRate
+    {
+        public string UOM { get; set; }
+        public TallyAmount Rate { get; set; }
+    }
+
+    public static class TallyUtil
+    {
+        public static string ReadString(XmlNode node, string key)
+        {
+            XmlNode xmlNode = node.SelectSingleNode(key);
+            if (xmlNode == null)
+                return string.Empty;
+
+            string value = xmlNode.InnerText;
+            return value;
+        }
+
+        public static string ReadUDF(XmlNode node, string key)
+        {
+            XmlNode xmlNode = node.SelectSingleNode("./*[local-name()='UDF:" + key + "']");
+            if (xmlNode == null)
+                return string.Empty;
+
+            string value = xmlNode.InnerText;
+            return value;
+        }
+
+        public static string ReadInnerNode(XmlNode node, string key, string path, int index)
+        {
+            XmlNodeList xmlNodes = node.SelectNodes(path + key);
+            if (xmlNodes == null)
+                return string.Empty;
+            string value = null;
+            if (xmlNodes[index] != null)
+                value = xmlNodes[index].InnerText;
+
+            if (string.IsNullOrEmpty(value))
+                return string.Empty;
+            else
+                return value;
+
+        }
+
+        public static string ReadAttribute(XmlNode node, string key)
+        {
+            if (node == null)
+                return string.Empty;
+            string value = node.Attributes[key]?.Value;
+            if (string.IsNullOrEmpty(value))
+                return string.Empty;
+            else
+                return value;
+        }
+
+        public static bool ReadBool(XmlNode node, string key)
+        {
+            string value = ReadString(node, key)?.Trim();
+            return value == "Yes" ? true : false;
+        }
+
+        public static bool ReadTrueFalse(XmlNode node, string key)
+        {
+            string value = ReadString(node, key)?.Trim();
+            return value == "true" ? true : false;
+        }
+
+        public static decimal ReadDecimal(XmlNode node, string key)
+        {
+            string value = ReadString(node, key)?.Trim();
+            decimal decimalValue;
+            decimal.TryParse(value, out decimalValue);
+            return decimalValue;
+        }
+
+        public static int ReadInt(XmlNode node, string key)
+        {
+            string value = ReadString(node, key)?.Trim();
+            int intValue = 0;
+            try
+            {
+                intValue = int.Parse(value);
+            }
+            catch
+            {
+                //Log
+            }
+            return intValue;
+        }
+
+        public static TallyQuantity ReadQty(XmlNode node, string key)
+        {
+            string value = ReadString(node, key)?.Trim();
+            TallyQuantity tallyQuantity = new TallyQuantity { Quantity = 0, UOM = "", AlternateQuantity = 0, AlternateUOM = "", QuantityString = value };
+
+            if (value.Contains("="))
+            {
+                value = value.Trim();
+
+                string firstNode = value.Split('=')[0];
+                string secondNode = value.Split('=')[1];
+                firstNode = firstNode.Trim();
+                secondNode = secondNode.Trim();
+
+                string quantity = firstNode.Split(' ')[0];
+                string uom = firstNode.Split(' ')[1];
+
+                tallyQuantity.UOM = uom;
+                tallyQuantity.Quantity = decimal.Parse(quantity);
+
+                quantity = secondNode.Split(' ')[0];
+                uom = secondNode.Split(' ')[1];
+                tallyQuantity.AlternateUOM = uom;
+                tallyQuantity.AlternateQuantity = decimal.Parse(quantity);
+            }
+            else
+            {
+                value = value.Trim();
+                if (value.Split(' ')?.Length == 2)
+                {
+                    string quantity = value.Split(' ')[0];
+                    string uom = value.Split(' ')[1];
+
+                    tallyQuantity.UOM = uom;
+                    tallyQuantity.Quantity = decimal.Parse(quantity);
+                }
+            }
+
+            return tallyQuantity;
+        }
+
+        public static TallyAmount ReadAmount(XmlNode node, string key)
+        {
+            string value = ReadString(node, key)?.Trim();
+            try
+            {
+                if (value.Contains("="))
+                {
+                    TallyAmount tallyAmount = ProcessFCAmount(value);
+                    return tallyAmount;
+                }
+                else
+                {
+                    TallyAmount tallyAmount = new TallyAmount();
+                    tallyAmount.BaseCurrencyAmount = decimal.Parse(value);
+                    return tallyAmount;
+                }
+            }
+            catch
+            {
+                TallyAmount tallyAmount = new TallyAmount();
+                tallyAmount.BaseCurrencyAmount = 0;
+                return tallyAmount;
+            }
+        }
+
+        private static TallyAmount ProcessFCAmount(string value)
+        {
+            bool isNegative;
+            string firstNode = value.Split('=')[0];
+            string secondNode = value.Split('=')[1];
+
+
+            string fcAmount = firstNode.Split('@')[0];
+            string rate = String.Empty;
+            if (firstNode.Contains("@"))
+                rate = firstNode.Split('@')[1];
+
+            if (fcAmount.Substring(0, 1) == "-")
+                isNegative = true;
+            else
+                isNegative = false;
+            string currency = String.Empty;
+            string textFCAmount = String.Empty;
+            for (int i = 0; i < fcAmount.Length; i++)
+            {
+                if (fcAmount.Substring(i, 1) == " " || fcAmount.Substring(i, 1) == "-")
+                    continue;
+                if ((textFCAmount != String.Empty && fcAmount.Substring(i, 1) == ".") || Regex.IsMatch(fcAmount.Substring(i, 1), "[0-9]"))
+                    textFCAmount += fcAmount.Substring(i, 1);
+                else
+                    currency += fcAmount.Substring(i, 1);
+            }
+
+            string textRate = String.Empty;
+            for (int i = 0; i < rate.Length; i++)
+            {
+                if ((rate.Substring(i, 1) == "." && rate.Length > i + 1 && Regex.IsMatch(rate.Substring(i + 1, 1), "[0-9]")) || Regex.IsMatch(rate.Substring(i, 1), "[0-9]"))
+                    textRate += rate.Substring(i, 1);
+            }
+
+            string textLCAmount = String.Empty;
+            for (int i = 0; i < secondNode.Length; i++)
+            {
+                if ((secondNode.Substring(i, 1) == "." && secondNode.Length > i + 1 && Regex.IsMatch(secondNode.Substring(i + 1, 1), "[0-9]")) || Regex.IsMatch(secondNode.Substring(i, 1), "[0-9]"))
+                    textLCAmount += secondNode.Substring(i, 1);
+            }
+
+            TallyAmount tallyAmount = new TallyAmount();
+            tallyAmount.ForeignCurrency = currency;
+            tallyAmount.BaseCurrencyAmount = isNegative ? decimal.Parse(textLCAmount) * -1 : decimal.Parse(textLCAmount);
+            if (!String.IsNullOrEmpty(textRate))
+                tallyAmount.Rate = decimal.Parse(textRate);
+            tallyAmount.ForeignCurrencyAmount = isNegative ? decimal.Parse(textFCAmount) * -1 : decimal.Parse(textFCAmount);
+            return tallyAmount;
+        }
+
+        public static DateTime ReadDate(XmlNode node, string key, string format)
+        {
+            string value = ReadString(node, key)?.Trim();
+            DateTime returnValue = new DateTime(2020, 01, 01);
+            try
+            {
+                if (format == "YYYYMMDD")
+                    returnValue = new DateTime(int.Parse(value.Substring(0, 4)), int.Parse(value.Substring(4, 2)), int.Parse(value.Substring(6, 2)));
+                else if (format == "dd-MMM-yyyy")
+                    returnValue = Convert.ToDateTime(value);
+                else if (format == "yyyy-MM-dd")
+                    returnValue = new DateTime(int.Parse(value.Substring(0, 4)), int.Parse(value.Substring(5, 2)), int.Parse(value.Substring(8, 2)));
+            }
+            catch
+            { }
+            return returnValue;
+        }
+
+        public static DateTime GetDueDate(DateTime date, string dayString)
+        {
+            DateTime billDate = new DateTime(2000, 01, 01);
+
+            if (date == null || String.IsNullOrEmpty(dayString))
+                return billDate;
+            else
+                billDate = (DateTime)date;
+
+            DateTime dueDate;
+            if (dayString.Contains("Day"))
+            {
+                int no = Convert.ToInt32(dayString.Split(' ')[0]);
+                dueDate = billDate.AddDays(no);
+                return dueDate;
+            }
+            if (dayString.Contains("Week"))
+            {
+                int no = Convert.ToInt32(dayString.Split(' ')[0]);
+                dueDate = billDate.AddDays(no * 7);
+                return dueDate;
+            }
+            if (dayString.Contains("Month"))
+            {
+                int no = Convert.ToInt32(dayString.Split(' ')[0]);
+                dueDate = billDate.AddMonths(no);
+                return dueDate;
+            }
+            if (dayString.Contains("Year"))
+            {
+                int no = Convert.ToInt32(dayString.Split(' ')[0]);
+                dueDate = billDate.AddYears(no);
+                return dueDate;
+            }
+
+            //If the due date is itself a date
+            try
+            {
+                dueDate = Convert.ToDateTime(dayString);
+                return dueDate;
+            }
+            catch
+            {
+                return date;
+            }
+        }
+
+        public static TallyRate ReadRate(XmlNode node, string key)
+        {
+            string value = ReadString(node, key)?.Trim();
+            TallyRate tallyRate = new TallyRate { Rate = new TallyAmount(), UOM = "" };
+
+            string amountString, uomString;
+            if (value.Split('/').Length == 2)
+            {
+                amountString = value.Split('/')[0];
+                uomString = value.Split('/')[1];
+
+                TallyAmount tallyAmount;
+                if (amountString.Contains("="))
+                {
+                    tallyAmount = ProcessFCAmount(amountString);
+                }
+                else
+                {
+                    tallyAmount = new TallyAmount();
+                    decimal decimalValue;
+                    decimal.TryParse(amountString, out decimalValue);
+                    tallyAmount.BaseCurrencyAmount = decimalValue;
+                }
+                tallyRate.Rate = tallyAmount;
+                tallyRate.UOM = uomString;
+            }
+            return tallyRate;
+        }
+
+        public static string CleanInvalidXmlChars(string text)
+        {
+            string pattern = @"&#4;";
+            string response = Regex.Replace(text, pattern, "", RegexOptions.Compiled);
+            //\x00-\x08\x0B\x0C
+            //\x26
+            pattern = "[\x00\x04\x05\x08\x0B\x0C\x0E-\x1F]";
+            response = Regex.Replace(text, pattern, "", RegexOptions.Compiled);
+
+            return response;
+        }
+
+
+    }
+}

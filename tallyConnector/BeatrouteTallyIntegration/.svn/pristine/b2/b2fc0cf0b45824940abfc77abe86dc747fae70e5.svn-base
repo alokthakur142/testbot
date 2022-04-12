@@ -1,0 +1,247 @@
+﻿using BeatrouteTallyIntegration.Utils;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationBase.Utils;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace BeatrouteTallyIntegration.Controls
+{
+    public partial class ctrlCompanyList : UserControl
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+        public ctrlCompanyList()
+        {
+            InitializeComponent();
+        }
+
+        #region Properties
+
+        private string _companyName;
+        private bool _stock;
+        private string _productFilter;
+        private bool _prodMaster;
+        private bool _customerMaster;
+        private bool _customerInvoice;
+        private bool _customerOrder;
+        private bool _customerPayment;
+        private bool _customerOutstanding;
+        private bool _active;
+
+
+        [Category("Custom Props")]
+        public string CompanyName
+        {
+            get { return _companyName; }
+            set { _companyName = value; lblCompanyName.Text = value; }
+        }
+
+        [Category("Custom Props")]
+        public string ProductFilter
+        {
+            get { return _productFilter; }
+            set { _productFilter = value; txtProductFilter.Text = value; }
+        }
+
+        [Category("Custom Props")]
+        public bool ProductMaster
+        {
+            get { return _prodMaster; }
+            set { _prodMaster = value; chkProductMaster.Checked = value; }
+        }
+
+        [Category("Custom Props")]
+        public bool CustomerMaster
+        {
+            get { return _customerMaster; }
+            set { _customerMaster = value; chkCustomerMaster.Checked = value; }
+        }
+
+        [Category("Custom Props")]
+        public bool CustomerInvoice
+        {
+            get { return _customerInvoice; }
+            set { _customerInvoice = value; chkCustomerInvoice.Checked = value; }
+        }
+
+        [Category("Custom Props")]
+        public bool CustomerOrder
+        {
+            get { return _customerOrder; }
+            set { _customerOrder = value; chkCustomerOrder.Checked = value; }
+        }
+
+        [Category("Custom Props")]
+        public bool CustomerPayment
+        {
+            get { return _customerPayment; }
+            set { _customerPayment = value; chkCustomerPayments.Checked = value; }
+        }
+
+        [Category("Custom Props")]
+        public bool CustomerOutstanding
+        {
+            get { return _customerOutstanding; }
+            set { _customerOutstanding = value; chkCustomerOutstanding.Checked = value; }
+        }
+
+        [Category("Custom Props")]
+        public bool Stock
+        {
+            get { return _stock; }
+            set { _stock = value; chkStock.Checked = value; }
+        }
+
+        [Category("Custom Props")]
+        public bool IsActive
+        {
+            get { return _active; }
+            set { _active = value; chkIsActive.Checked = value; }
+        }
+
+        #endregion
+
+        public void SetActiveStatus()
+        {
+            if (IsActive)
+            {
+                chkIsActive.Text = "Active";
+                chkIsActive.ForeColor = Color.Green;
+                chkIsActive.Checked = true;
+            }
+            else if (!IsActive)
+            {
+                chkIsActive.Text = "Inactive";
+                chkIsActive.ForeColor = Color.Crimson;
+                chkIsActive.Checked = false;
+            }
+        }
+
+        private void chkIsActive_Click(object sender, EventArgs e)
+        {
+            //Subhabrata 30-Aug-2021 : Added try-catch, All condition checkings under 1 UnitOfWork block
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    if (chkIsActive.Checked)
+                    {
+                        bool confirm = MessagePopup.AskConfirmation("Are you sure you want to activate this company ?");
+                        if (confirm)
+                        {
+                            chkIsActive.Text = "Active";
+                            chkIsActive.ForeColor = Color.Green;
+                            var companyName = lblCompanyName.Text;
+                            Company companyToSetActive = uow.Company.GetList().Where(x => x.CompanyName == companyName).FirstOrDefault();
+                            if (companyToSetActive != null)
+                            {
+                                companyToSetActive.IsActive = true;
+
+                                uow.Company.Update(companyToSetActive);
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Company - " + companyName + " is activated successfully" + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                                #region Old - Code for activating only one compnay
+                                //Deativate all other companies
+                                //List<Company> companiesToDeactivate = uow.Company.GetList().Where(x => x.Id != companyToSetActive.Id).ToList();
+                                //foreach (Company company in companiesToDeactivate)
+                                //{
+                                //    company.IsActive = false;
+
+                                //    uow.Company.Update(company);
+                                //    _logger.Info("ImportWorker|" + Session.UserName + "|Company - " + company.CompanyName + " is deactivated successfully" + "^");
+                                //    _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+                                //} 
+                                #endregion
+                                //access the parent control and then refresh
+                                ((ctrlCompanies)(this.Parent.Parent)).RefreshGrid();
+                            }
+
+                        }
+                        else
+                            chkIsActive.Checked = false;
+                    }
+                    else if (!chkIsActive.Checked)
+                    {
+                        bool confirm = MessagePopup.AskConfirmation("Are you sure you want to deactivate this company ?");
+                        if (confirm)
+                        {
+                            chkIsActive.Text = "Inactive";
+                            chkIsActive.ForeColor = Color.Crimson;
+                            var companyName = lblCompanyName.Text;
+                            Company companyToSetInActive = uow.Company.GetList().Where(x => x.CompanyName == companyName).FirstOrDefault();
+                            if (companyToSetInActive != null)
+                            {
+                                companyToSetInActive.IsActive = false;
+
+                                uow.Company.Update(companyToSetInActive);
+                                _logger.Info("ImportWorker|" + Session.UserName + "|Company - " + companyName + " is deactivated successfully" + "^");
+                                _logger.Info("ImportWorker|" + Session.UserName + "|" + "^");
+
+                                //access the parent control and then refresh
+                                ((ctrlCompanies)(this.Parent.Parent)).RefreshGrid();
+                            }
+
+                        }
+                        else
+                        {
+                            chkIsActive.Checked = true;
+                        }
+                    }
+                }
+            }
+            catch(Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+
+        private void btnSave_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    Company company = uow.Company.GetList().Where(x => x.CompanyName == lblCompanyName.Text).FirstOrDefault();
+                    if (company != null)
+                    {
+                        company.ProductMaster = chkProductMaster.Checked;
+                        company.CustomerMaster = chkCustomerMaster.Checked;
+                        company.CustomerInvoice = chkCustomerInvoice.Checked;
+                        company.CustomerOrder = chkCustomerOrder.Checked;
+                        company.CustomerPayment = chkCustomerPayments.Checked;
+                        company.CustomerOutstanding = chkCustomerOutstanding.Checked;
+                        company.Stock = chkStock.Checked;
+
+                        uow.Company.Update(company);
+
+                        bool isPosted = ApiHelper.PostSettings();//Posting Settings value and compnay workflow value while clicking save button from Company control screen
+                        if (isPosted != false)
+                        {
+                            _logger.Info("ImportWorker|" + Session.UserName + "|Settings posting successfully from AddCompnay screen" + "^");
+                        }
+                        else
+                            ErrorLogger.LogError(_logger, "Post Settings", "ImportWorker|" + Session.UserName + "|Settings posting failed from AddCompnay screen" + "^");
+
+                        MessagePopup.ShowMessage(string.Format("Settings for {0} saved successfully !", company.CompanyName));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+    }
+}

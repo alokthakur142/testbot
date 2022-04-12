@@ -1,0 +1,132 @@
+﻿namespace BeatrouteTallyIntegration.Controls
+{
+    partial class ctrlCompanySyncStatus
+    {
+        /// <summary> 
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary> 
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Component Designer generated code
+
+        /// <summary> 
+        /// Required method for Designer support - do not modify 
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            this.lblCompanyId = new System.Windows.Forms.Label();
+            this.lblCompanyName = new System.Windows.Forms.Label();
+            this.lblStatus = new System.Windows.Forms.Label();
+            this.lblLastTallySync = new System.Windows.Forms.Label();
+            this.lblLastSyncWeb = new System.Windows.Forms.Label();
+            this.lblSyncNow = new System.Windows.Forms.Label();
+            this.SuspendLayout();
+            // 
+            // lblCompanyId
+            // 
+            this.lblCompanyId.AutoSize = true;
+            this.lblCompanyId.Location = new System.Drawing.Point(4, 0);
+            this.lblCompanyId.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.lblCompanyId.Name = "lblCompanyId";
+            this.lblCompanyId.Size = new System.Drawing.Size(78, 17);
+            this.lblCompanyId.TabIndex = 4;
+            this.lblCompanyId.Text = "CompanyId";
+            this.lblCompanyId.Visible = false;
+            // 
+            // lblCompanyName
+            // 
+            this.lblCompanyName.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblCompanyName.Location = new System.Drawing.Point(14, 17);
+            this.lblCompanyName.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.lblCompanyName.Name = "lblCompanyName";
+            this.lblCompanyName.Size = new System.Drawing.Size(413, 52);
+            this.lblCompanyName.TabIndex = 5;
+            this.lblCompanyName.Text = "This is a sample company name which is very long";
+            // 
+            // lblStatus
+            // 
+            this.lblStatus.AutoSize = true;
+            this.lblStatus.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblStatus.ForeColor = System.Drawing.Color.DarkOliveGreen;
+            this.lblStatus.Location = new System.Drawing.Point(6, 69);
+            this.lblStatus.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.lblStatus.Name = "lblStatus";
+            this.lblStatus.Size = new System.Drawing.Size(108, 17);
+            this.lblStatus.TabIndex = 6;
+            this.lblStatus.Text = "Status: Active";
+            // 
+            // lblLastTallySync
+            // 
+            this.lblLastTallySync.AutoSize = true;
+            this.lblLastTallySync.Location = new System.Drawing.Point(6, 95);
+            this.lblLastTallySync.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.lblLastTallySync.Name = "lblLastTallySync";
+            this.lblLastTallySync.Size = new System.Drawing.Size(122, 17);
+            this.lblLastTallySync.TabIndex = 7;
+            this.lblLastTallySync.Text = "Last Sync (Tally): ";
+            // 
+            // lblLastSyncWeb
+            // 
+            this.lblLastSyncWeb.AutoSize = true;
+            this.lblLastSyncWeb.Location = new System.Drawing.Point(7, 122);
+            this.lblLastSyncWeb.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.lblLastSyncWeb.Name = "lblLastSyncWeb";
+            this.lblLastSyncWeb.Size = new System.Drawing.Size(121, 17);
+            this.lblLastSyncWeb.TabIndex = 8;
+            this.lblLastSyncWeb.Text = "Last Sync (Web): ";
+            // 
+            // lblSyncNow
+            // 
+            this.lblSyncNow.AutoSize = true;
+            this.lblSyncNow.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Underline, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblSyncNow.ForeColor = System.Drawing.SystemColors.HotTrack;
+            this.lblSyncNow.Location = new System.Drawing.Point(357, 69);
+            this.lblSyncNow.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.lblSyncNow.Name = "lblSyncNow";
+            this.lblSyncNow.Size = new System.Drawing.Size(70, 17);
+            this.lblSyncNow.TabIndex = 9;
+            this.lblSyncNow.Text = "Sync Now";
+            this.lblSyncNow.Click += new System.EventHandler(this.lblSyncNow_Click);
+            // 
+            // ctrlCompanySyncStatus
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.Color.White;
+            this.Controls.Add(this.lblSyncNow);
+            this.Controls.Add(this.lblLastSyncWeb);
+            this.Controls.Add(this.lblLastTallySync);
+            this.Controls.Add(this.lblStatus);
+            this.Controls.Add(this.lblCompanyName);
+            this.Controls.Add(this.lblCompanyId);
+            this.Name = "ctrlCompanySyncStatus";
+            this.Size = new System.Drawing.Size(443, 150);
+            this.ResumeLayout(false);
+            this.PerformLayout();
+
+        }
+
+        #endregion
+
+        private System.Windows.Forms.Label lblCompanyId;
+        private System.Windows.Forms.Label lblCompanyName;
+        private System.Windows.Forms.Label lblStatus;
+        private System.Windows.Forms.Label lblLastTallySync;
+        private System.Windows.Forms.Label lblLastSyncWeb;
+        private System.Windows.Forms.Label lblSyncNow;
+    }
+}

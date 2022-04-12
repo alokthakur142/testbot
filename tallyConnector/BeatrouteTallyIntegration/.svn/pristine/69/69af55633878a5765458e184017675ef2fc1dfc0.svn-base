@@ -1,0 +1,17 @@
+﻿using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.Models.ViewModels;
+using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.BusinessRepository.Interface
+{
+    public interface ICustomerPaymentPostingConfirmationRepository : IRepository<CustomerPaymentPostingConfirmation>
+    {
+
+        IEnumerable<CustomerPaymentPostingViewModel> GetCustomerPaymentPostingData();
+    }
+}

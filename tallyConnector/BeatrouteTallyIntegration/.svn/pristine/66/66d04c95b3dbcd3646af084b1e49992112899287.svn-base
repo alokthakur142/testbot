@@ -1,0 +1,124 @@
+﻿
+namespace BeatrouteTallyIntegration.Controls
+{
+    partial class ctrlCustomerPaymentConfirmation
+    {
+        /// <summary> 
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary> 
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Component Designer generated code
+
+        /// <summary> 
+        /// Required method for Designer support - do not modify 
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            this.btnPost = new System.Windows.Forms.Button();
+            this.btnSync = new System.Windows.Forms.Button();
+            this.label1 = new System.Windows.Forms.Label();
+            this.gridViewCustomerPaymentPostingConfirmation = new System.Windows.Forms.DataGridView();
+            ((System.ComponentModel.ISupportInitialize)(this.gridViewCustomerPaymentPostingConfirmation)).BeginInit();
+            this.SuspendLayout();
+            // 
+            // btnPost
+            // 
+            this.btnPost.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnPost.BackColor = System.Drawing.Color.SteelBlue;
+            this.btnPost.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnPost.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.btnPost.ForeColor = System.Drawing.Color.White;
+            this.btnPost.Location = new System.Drawing.Point(530, 0);
+            this.btnPost.Name = "btnPost";
+            this.btnPost.Size = new System.Drawing.Size(106, 32);
+            this.btnPost.TabIndex = 5;
+            this.btnPost.Text = "Post";
+            this.btnPost.UseVisualStyleBackColor = false;
+            this.btnPost.Click += new System.EventHandler(this.btnPost_Click);
+            // 
+            // btnSync
+            // 
+            this.btnSync.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnSync.BackColor = System.Drawing.Color.SteelBlue;
+            this.btnSync.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnSync.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.btnSync.ForeColor = System.Drawing.Color.White;
+            this.btnSync.Location = new System.Drawing.Point(418, 0);
+            this.btnSync.Name = "btnSync";
+            this.btnSync.Size = new System.Drawing.Size(106, 32);
+            this.btnSync.TabIndex = 4;
+            this.btnSync.Text = "Sync";
+            this.btnSync.UseVisualStyleBackColor = false;
+            this.btnSync.Click += new System.EventHandler(this.btnSync_Click);
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.BackColor = System.Drawing.Color.White;
+            this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label1.Location = new System.Drawing.Point(17, 7);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(254, 18);
+            this.label1.TabIndex = 6;
+            this.label1.Text = "Customer Payment Confirmation";
+            // 
+            // gridViewCustomerPaymentPostingConfirmation
+            // 
+            this.gridViewCustomerPaymentPostingConfirmation.AllowUserToAddRows = false;
+            this.gridViewCustomerPaymentPostingConfirmation.AllowUserToDeleteRows = false;
+            this.gridViewCustomerPaymentPostingConfirmation.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.gridViewCustomerPaymentPostingConfirmation.BackgroundColor = System.Drawing.Color.White;
+            this.gridViewCustomerPaymentPostingConfirmation.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.gridViewCustomerPaymentPostingConfirmation.CellBorderStyle = System.Windows.Forms.DataGridViewCellBorderStyle.None;
+            this.gridViewCustomerPaymentPostingConfirmation.ColumnHeadersBorderStyle = System.Windows.Forms.DataGridViewHeaderBorderStyle.Single;
+            this.gridViewCustomerPaymentPostingConfirmation.Location = new System.Drawing.Point(20, 38);
+            this.gridViewCustomerPaymentPostingConfirmation.Name = "gridViewCustomerPaymentPostingConfirmation";
+            this.gridViewCustomerPaymentPostingConfirmation.ReadOnly = true;
+            this.gridViewCustomerPaymentPostingConfirmation.RowHeadersBorderStyle = System.Windows.Forms.DataGridViewHeaderBorderStyle.Single;
+            this.gridViewCustomerPaymentPostingConfirmation.RowTemplate.Height = 24;
+            this.gridViewCustomerPaymentPostingConfirmation.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.CellSelect;
+            this.gridViewCustomerPaymentPostingConfirmation.Size = new System.Drawing.Size(616, 374);
+            this.gridViewCustomerPaymentPostingConfirmation.TabIndex = 7;
+            // 
+            // ctrlCustomerPaymentConfirmation
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.Color.Transparent;
+            this.Controls.Add(this.gridViewCustomerPaymentPostingConfirmation);
+            this.Controls.Add(this.label1);
+            this.Controls.Add(this.btnPost);
+            this.Controls.Add(this.btnSync);
+            this.Name = "ctrlCustomerPaymentConfirmation";
+            this.Size = new System.Drawing.Size(649, 438);
+            this.Load += new System.EventHandler(this.ctrlCustomerPaymentConfirmation_Load);
+            ((System.ComponentModel.ISupportInitialize)(this.gridViewCustomerPaymentPostingConfirmation)).EndInit();
+            this.ResumeLayout(false);
+            this.PerformLayout();
+
+        }
+
+        #endregion
+        private System.Windows.Forms.Button btnPost;
+        private System.Windows.Forms.Button btnSync;
+        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.DataGridView gridViewCustomerPaymentPostingConfirmation;
+    }
+}

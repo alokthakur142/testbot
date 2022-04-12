@@ -1,0 +1,35 @@
+﻿using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.Models
+{
+    [ModelAttributes(Key = "Id", TableName = "CustomerOutstanding")]
+    public class CustomerOutstanding
+    {
+        public Guid Id { get; set; }
+        
+        public DateTime Timestamp { get; set; }
+
+        public string CompanyId { get; set; }
+
+        public string CustomerId { get; set; }
+
+        public decimal OutstandingAmount { get; set; }
+        
+        public string Guid { get; set; }
+
+        public bool IsPosted { get; set; }
+
+        public decimal RetryCount { get; set; }
+
+        public string PostingMessage { get; set; }
+
+        public DateTime PostedOn { get; set; }
+
+        public DateTime ImportedOn { get; set; }
+    }
+}

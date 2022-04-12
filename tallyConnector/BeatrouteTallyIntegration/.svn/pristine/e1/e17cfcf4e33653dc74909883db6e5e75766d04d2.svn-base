@@ -1,0 +1,189 @@
+﻿namespace BeatrouteTallyIntegration.Controls
+{
+    partial class ctrlLogs
+    {
+        /// <summary> 
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary> 
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Component Designer generated code
+
+        /// <summary> 
+        /// Required method for Designer support - do not modify 
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            this.lblAppLog = new System.Windows.Forms.LinkLabel();
+            this.lblApiLog = new System.Windows.Forms.LinkLabel();
+            this.label1 = new System.Windows.Forms.Label();
+            this.btnSendLogs = new System.Windows.Forms.Button();
+            this.dataGridViewErrorLog = new System.Windows.Forms.DataGridView();
+            this.label2 = new System.Windows.Forms.Label();
+            this.lnkLblShowAll = new System.Windows.Forms.LinkLabel();
+            this.label3 = new System.Windows.Forms.Label();
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridViewErrorLog)).BeginInit();
+            this.SuspendLayout();
+            // 
+            // lblAppLog
+            // 
+            this.lblAppLog.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.lblAppLog.AutoSize = true;
+            this.lblAppLog.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.lblAppLog.Location = new System.Drawing.Point(754, 25);
+            this.lblAppLog.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.lblAppLog.Name = "lblAppLog";
+            this.lblAppLog.Size = new System.Drawing.Size(62, 18);
+            this.lblAppLog.TabIndex = 0;
+            this.lblAppLog.TabStop = true;
+            this.lblAppLog.Text = "App Log";
+            this.lblAppLog.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.lblAppLog_LinkClicked);
+            // 
+            // lblApiLog
+            // 
+            this.lblApiLog.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.lblApiLog.AutoSize = true;
+            this.lblApiLog.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.lblApiLog.Location = new System.Drawing.Point(538, 16);
+            this.lblApiLog.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.lblApiLog.Name = "lblApiLog";
+            this.lblApiLog.Size = new System.Drawing.Size(57, 18);
+            this.lblApiLog.TabIndex = 1;
+            this.lblApiLog.TabStop = true;
+            this.lblApiLog.Text = "Api Log";
+            this.lblApiLog.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.lblApiLog_LinkClicked);
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F);
+            this.label1.ForeColor = System.Drawing.Color.Black;
+            this.label1.Location = new System.Drawing.Point(5, 25);
+            this.label1.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(306, 18);
+            this.label1.TabIndex = 4;
+            this.label1.Text = "Click on the links to view the detailed log files:";
+            // 
+            // btnSendLogs
+            // 
+            this.btnSendLogs.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnSendLogs.BackColor = System.Drawing.Color.DarkOrange;
+            this.btnSendLogs.FlatAppearance.BorderColor = System.Drawing.Color.Salmon;
+            this.btnSendLogs.FlatAppearance.BorderSize = 0;
+            this.btnSendLogs.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnSendLogs.Location = new System.Drawing.Point(387, 10);
+            this.btnSendLogs.Name = "btnSendLogs";
+            this.btnSendLogs.Size = new System.Drawing.Size(146, 33);
+            this.btnSendLogs.TabIndex = 5;
+            this.btnSendLogs.Text = "Send Logs to BeatRoute";
+            this.btnSendLogs.UseVisualStyleBackColor = false;
+            this.btnSendLogs.Click += new System.EventHandler(this.btnSendLogs_Click);
+            // 
+            // dataGridViewErrorLog
+            // 
+            this.dataGridViewErrorLog.AllowUserToAddRows = false;
+            this.dataGridViewErrorLog.AllowUserToDeleteRows = false;
+            this.dataGridViewErrorLog.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.dataGridViewErrorLog.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
+            this.dataGridViewErrorLog.AutoSizeRowsMode = System.Windows.Forms.DataGridViewAutoSizeRowsMode.AllCells;
+            this.dataGridViewErrorLog.BackgroundColor = System.Drawing.Color.White;
+            this.dataGridViewErrorLog.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.dataGridViewErrorLog.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.dataGridViewErrorLog.Location = new System.Drawing.Point(0, 99);
+            this.dataGridViewErrorLog.Margin = new System.Windows.Forms.Padding(2);
+            this.dataGridViewErrorLog.Name = "dataGridViewErrorLog";
+            this.dataGridViewErrorLog.ReadOnly = true;
+            this.dataGridViewErrorLog.RowHeadersWidth = 51;
+            this.dataGridViewErrorLog.RowTemplate.Height = 24;
+            this.dataGridViewErrorLog.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.dataGridViewErrorLog.Size = new System.Drawing.Size(841, 359);
+            this.dataGridViewErrorLog.TabIndex = 6;
+            // 
+            // label2
+            // 
+            this.label2.AutoSize = true;
+            this.label2.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.label2.Location = new System.Drawing.Point(7, 52);
+            this.label2.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(457, 15);
+            this.label2.TabIndex = 7;
+            this.label2.Text = "The log shows the last 100 entries by default. The log stores data for the last 7" +
+    " days.";
+            // 
+            // lnkLblShowAll
+            // 
+            this.lnkLblShowAll.AutoSize = true;
+            this.lnkLblShowAll.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lnkLblShowAll.Location = new System.Drawing.Point(7, 74);
+            this.lnkLblShowAll.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.lnkLblShowAll.Name = "lnkLblShowAll";
+            this.lnkLblShowAll.Size = new System.Drawing.Size(63, 15);
+            this.lnkLblShowAll.TabIndex = 8;
+            this.lnkLblShowAll.TabStop = true;
+            this.lnkLblShowAll.Text = "Click Here";
+            this.lnkLblShowAll.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.lnkLblShowAll_LinkClicked);
+            // 
+            // label3
+            // 
+            this.label3.AutoSize = true;
+            this.label3.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label3.Location = new System.Drawing.Point(69, 74);
+            this.label3.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(145, 15);
+            this.label3.TabIndex = 9;
+            this.label3.Text = "to show all the log entries";
+            // 
+            // ctrlLogs
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.Color.White;
+            this.Controls.Add(this.label3);
+            this.Controls.Add(this.lnkLblShowAll);
+            this.Controls.Add(this.label2);
+            this.Controls.Add(this.dataGridViewErrorLog);
+            this.Controls.Add(this.label1);
+            this.Controls.Add(this.btnSendLogs);
+            this.Controls.Add(this.lblApiLog);
+            this.Controls.Add(this.lblAppLog);
+            this.ForeColor = System.Drawing.Color.Black;
+            this.Name = "ctrlLogs";
+            this.Size = new System.Drawing.Size(841, 458);
+            this.Load += new System.EventHandler(this.ctrlLogs_Load);
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridViewErrorLog)).EndInit();
+            this.ResumeLayout(false);
+            this.PerformLayout();
+
+        }
+
+        #endregion
+
+        private System.Windows.Forms.LinkLabel lblAppLog;
+        private System.Windows.Forms.LinkLabel lblApiLog;
+        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.Button btnSendLogs;
+        private System.Windows.Forms.DataGridView dataGridViewErrorLog;
+        private System.Windows.Forms.Label label2;
+        private System.Windows.Forms.LinkLabel lnkLblShowAll;
+        private System.Windows.Forms.Label label3;
+    }
+}

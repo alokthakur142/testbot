@@ -1,0 +1,114 @@
+﻿using BeatrouteTallyIntegration.Utils;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationBase.Import;
+using BeatrouteTallyIntegrationBase.Utils;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace BeatrouteTallyIntegration.Controls
+{
+    public partial class ctrlCustomerPaymentConfirmation : UserControl
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+        public ctrlCustomerPaymentConfirmation()
+        {
+            InitializeComponent();
+        }
+
+        private void ctrlCustomerPaymentConfirmation_Load(object sender, EventArgs e)
+        {
+            RefreshGrid();
+            gridViewCustomerPaymentPostingConfirmation.MultiSelect = true;
+        }
+
+        private void RefreshGrid()
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    var customerPaymentPostingConfirmationList = uow.CustomerPaymentPostingConfirmation.GetCustomerPaymentPostingData();
+                    gridViewCustomerPaymentPostingConfirmation.DataSource = new BindingSource { DataSource = customerPaymentPostingConfirmationList };
+                    gridViewCustomerPaymentPostingConfirmation.Columns["Id"].Visible = false;
+                    gridViewCustomerPaymentPostingConfirmation.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                    gridViewCustomerPaymentPostingConfirmation.AutoResizeColumns();
+                }
+
+                foreach (DataGridViewColumn column in gridViewCustomerPaymentPostingConfirmation.Columns)
+                {
+                    //Modify according to need
+                    //if (column.Name != "" && column.Name != "")
+                    //    column.Visible = false;
+                    column.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+
+        private void btnSync_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                List<string> activeCompanyNames = new List<string>();
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    var customerList = uow.CustomerPayment.GetList().Where(x => !x.IsPosted).ToList();
+                    ImportController impController = new ImportController();
+                    impController.UpdateReceipt(customerList);
+                }
+
+                RefreshGrid();
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+
+        private void btnPost_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    List<CustomerPaymentPostingConfirmation> confirmList = new List<CustomerPaymentPostingConfirmation>();
+                    foreach (DataGridViewRow row in gridViewCustomerPaymentPostingConfirmation.SelectedRows)
+                    {
+                        bool isOptional = Convert.ToBoolean(row.Cells["IsOptional"].Value);
+                        string postinConfirmId = row.Cells["Id"].Value.ToString();
+                        Guid id;
+                        Guid.TryParse(postinConfirmId, out id);
+                        CustomerPaymentPostingConfirmation customer = uow.CustomerPaymentPostingConfirmation.GetById(id);
+
+                        confirmList.Add(customer);
+                    }
+                    if (confirmList.Count > 0)
+                    {
+                        ApiHelper.PostCustomerPaymentPostingConfirmation(confirmList);
+                    }
+
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+    }
+}

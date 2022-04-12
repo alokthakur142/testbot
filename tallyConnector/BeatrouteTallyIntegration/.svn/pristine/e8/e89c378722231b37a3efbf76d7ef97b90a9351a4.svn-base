@@ -1,0 +1,17 @@
+﻿using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.Models
+{
+    [ModelAttributes(Key = "Id", TableName = "UpdateDetails")]
+    public class UpdateDetails
+    {
+        public Guid Id { get; set; }
+
+        public DateTime LastUpdateTime { get; set; }
+    }
+}

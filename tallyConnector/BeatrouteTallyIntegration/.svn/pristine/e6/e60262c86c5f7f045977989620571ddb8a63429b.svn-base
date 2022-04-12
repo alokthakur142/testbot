@@ -1,0 +1,16 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationBase.API
+{
+    public class customerOutstanding
+    {
+        public DateTime timestamp { get; set; }
+        public string companyId { get; set; }
+        public string customerId { get; set; }
+        public decimal outstandingAmount { get; set; }
+    }
+}

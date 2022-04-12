@@ -1,0 +1,52 @@
+﻿using OrchidDALBase;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationDAL.QueryHelperMethods
+{
+    public class QueryHelper
+    {
+
+        public static string GetDbVersion()
+        {
+            return "SELECT Max(VersionNo) as VersionNo from DbVersion;";
+        }
+
+        public static string SetDbVersion(int versionNo)
+        {
+            return string.Format("DELETE FROM DbVersion;INSERT INTO DbVersion(Id,VersionNo,VersionDate) values('{0}','{1}','{2}')", Guid.NewGuid(), versionNo, DateTime.Now);
+        }
+
+        public static string GetCustomerPaymentPostingDataQuery()
+        {
+            return string.Format(@"SELECT CustomerPaymentPostingConfirmation.Id, Company.CompanyName, IsOptional,
+                                   IsSuccess, CustomerPaymentPostingConfirmation.IsPosted, CustomerPaymentPostingConfirmation.PostedOn,
+                                   CustomerPaymentPostingConfirmation.PostingMessage, CustomerPaymentPostingConfirmation.RetryCount
+                                   FROM CustomerPaymentPostingConfirmation
+                                   INNER JOIN Company
+                                   ON CustomerPaymentPostingConfirmation.CompanyId = Company.Guid
+                                   WHERE CustomerPaymentPostingConfirmation.IsPosted = 0");
+        }
+
+        internal static string GetErrorLogTop100DataQuery()
+        {
+            return string.Format(@"Select ErrorLog.Api, ErrorLog.Message, ErrorLog.TimeStamp FROM ErrorLog 
+                                    ORDER BY TimeStamp DESC LIMIT 100
+                                   ");
+                                   
+        }
+
+        internal static string GetErrorLogFullDataQuery()
+        {
+            return string.Format(@"Select ErrorLog.Api, ErrorLog.Message, ErrorLog.TimeStamp FROM ErrorLog 
+                                    ORDER BY TimeStamp DESC
+                                    ");
+
+        }        
+
+    }
+}

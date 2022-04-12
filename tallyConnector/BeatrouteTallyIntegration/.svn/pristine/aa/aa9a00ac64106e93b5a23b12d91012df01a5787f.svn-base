@@ -1,0 +1,40 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationBase.Helpers
+{
+    public static class SyncStatusTextMessageHelper
+    {
+        public static readonly string Outstandings = "CUSTOMER_OUTSTANDINGS";
+        public static readonly string Skus = "SKUS";
+        public static readonly string Stocks = "STOCKS";
+        public static readonly string SalesInvoices = "SALES_INVOICES";
+        public static readonly string SalesOrders = "SALES_ORDERS";
+                      
+        public static readonly string Idle = "Idle";
+                     
+        public static readonly string TallyDataSyncProgress = "Data syncing from tally in progress";
+        public static readonly string TallyDataSyncWithError = "Data syncing from tally is not completed";
+        public static readonly string TallyDataSyncWithoutError = "Data syncing from tally is completed successfully";
+                     
+        public static readonly string TallyDataPostProgress = "Data posting to BeatRoute in progress";
+        public static readonly string TallyDataPostWithError = "Data posting to BeatRoute is not completed";
+        public static readonly string TallyDataPostWithoutError = "Data posting to BeatRoute is completed successfully";
+                     
+        public static readonly string SalesOrderSyncProgress = "Data syncing from Beatroute in progress";
+        public static readonly string SalesOrderSyncWithError = "Data syncing from Beatroute is not completed";
+        public static readonly string SalesOrderSyncWithoutError = "Data syncing from Beatroute is completed successfully";
+                     
+        public static readonly string SalesOrderPostProgress = "Data posting to Tally in progress";
+        public static readonly string SalesOrderPostWithError = "Data posting to Tally is not completed";
+        public static readonly string SalesOrderPostWithoutError = "Data posting to Tally is completed successfully";
+                      
+        public static readonly string SingularErrorText = " Error";//Don't remove the space
+        public static readonly string PluralErrorText = " Errors";//Don't remove the space
+
+
+    }
+}

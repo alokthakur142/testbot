@@ -1,0 +1,50 @@
+﻿using BeatrouteTallyIntegration.Database.Scripts;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace BeatrouteTallyIntegration.Controls
+{
+    public partial class ctrlApiCall : UserControl
+    {
+        
+        public ctrlApiCall()
+        {
+            InitializeComponent();
+        }
+
+        private void ctrlApiCall_Load(object sender, EventArgs e)
+        {
+           
+            RefreshGrid();
+
+        }
+        public void RefreshGrid()
+        {
+            using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+            {
+                var apiCallList = uow.ApiCall.GetList();
+                gridViewApiCall.DataSource = new BindingSource { DataSource = apiCallList };
+                gridViewApiCall.Columns["Id"].Visible = false;
+                gridViewApiCall.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                gridViewApiCall.AutoResizeColumns();
+                
+            }
+
+            foreach (DataGridViewColumn column in gridViewApiCall.Columns)
+            {               
+                column.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            }
+        }
+        
+    }
+}

@@ -1,0 +1,143 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using BeatrouteTallyIntegration.Forms;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationDAL.Models;
+using NLog;
+using BeatrouteTallyIntegration.Utils;
+using BeatrouteTallyIntegrationBase.Utils;
+
+namespace BeatrouteTallyIntegration.Controls
+{
+    public partial class ctrlCompanies : UserControl
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+        public ctrlCompanies()
+        {
+            InitializeComponent();
+        }
+
+        private void btnAdd_Click(object sender, EventArgs e)
+        {
+            frmAddCompany frm = new frmAddCompany();
+            frm.StartPosition = FormStartPosition.CenterScreen;
+            frm.ShowDialog();            
+            PostCompnayWorkflowValue();
+            GetCompnayWorkflowVlaue();
+            RefreshGrid();                        
+        }
+
+        private void ctrlCompanies_Load(object sender, EventArgs e)
+        {
+            GetCompnayWorkflowVlaue();
+            RefreshGrid();
+            //gridViewCompanies.MultiSelect = true;
+        }
+
+        public void RefreshGrid()
+        {
+
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+                    var companyList = uow.Company.GetList();
+                    flowLayoutPanel1.Controls.Clear();
+                    flowLayoutPanel1.SuspendLayout();
+                    foreach (Company company in companyList)
+                    {
+                        ctrlCompanyList companyListItem = new ctrlCompanyList();
+                        companyListItem.CompanyName = company.CompanyName;
+                        companyListItem.ProductFilter = Session.ProductFilter;
+                        companyListItem.ProductMaster = company.ProductMaster;
+                        companyListItem.CustomerInvoice = company.CustomerInvoice;
+                        companyListItem.CustomerMaster = company.CustomerMaster;
+                        companyListItem.CustomerOrder = company.CustomerOrder;
+                        companyListItem.CustomerOutstanding = company.CustomerOutstanding;
+                        companyListItem.CustomerPayment = company.CustomerPayment;
+                        companyListItem.Stock = company.Stock;
+                        companyListItem.IsActive = company.IsActive;
+                        companyListItem.SetActiveStatus();
+
+                        flowLayoutPanel1.Controls.Add(companyListItem);
+                    }
+                }
+                flowLayoutPanel1.ResumeLayout();
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+        public void GetCompnayWorkflowVlaue()
+        {
+            using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+            {
+                bool isPosted = ApiHelper.GetSettings();
+                if (isPosted != false)
+                {
+                    Company company = uow.Company.GetList().Where(x => x.IsActive == true).FirstOrDefault();
+                    if (company != null)
+                    {
+                        Settings POST_SKU = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "POST_SKU").FirstOrDefault();
+                        if (POST_SKU != null)
+                        {
+                            company.ProductMaster = Convert.ToBoolean(POST_SKU.Value);
+                        }
+                        Settings POST_CUSTOMER = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "POST_CUSTOMER").FirstOrDefault();
+                        if (POST_SKU != null)
+                        {
+                            company.CustomerMaster = Convert.ToBoolean(POST_CUSTOMER.Value);
+                        }
+                        Settings POST_INVOICE = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "POST_INVOICE").FirstOrDefault();
+                        if (POST_SKU != null)
+                        {
+                            company.CustomerInvoice = Convert.ToBoolean(POST_INVOICE.Value);
+                        }
+                        Settings GET_ORDER = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "GET_ORDER").FirstOrDefault();
+                        if (POST_SKU != null)
+                        {
+                            company.CustomerOrder = Convert.ToBoolean(GET_ORDER.Value);
+                        }
+                        Settings GET_PAYMENT = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "GET_PAYMENT").FirstOrDefault();
+                        if (POST_SKU != null)
+                        {
+                            company.CustomerPayment = Convert.ToBoolean(GET_PAYMENT.Value);
+                        }
+                        Settings POST_OUTSTANDING = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "POST_OUTSTANDING").FirstOrDefault();
+                        if (POST_SKU != null)
+                        {
+                            company.CustomerOutstanding = Convert.ToBoolean(POST_OUTSTANDING.Value);
+                        }
+                        Settings POST_STOCK = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "POST_STOCK").FirstOrDefault();
+                        if (POST_SKU != null)
+                        {
+                            company.Stock = Convert.ToBoolean(POST_STOCK.Value);
+                        }
+                        uow.Company.Update(company);
+                    } 
+                }
+
+            }
+        }
+        public void PostCompnayWorkflowValue()
+        {
+            bool isPosted = ApiHelper.PostSettings();
+            if (isPosted != false)
+            {
+                _logger.Info("ImportWorker|" + Session.UserName + "|Settings posting successfully from AddCompnay screen" + "^");
+            }
+            else
+                ErrorLogger.LogError(_logger, "Post Settings", "ImportWorker|" + Session.UserName + "|Settings posting failed from AddCompnay screen" + "^");
+        }
+    }
+}

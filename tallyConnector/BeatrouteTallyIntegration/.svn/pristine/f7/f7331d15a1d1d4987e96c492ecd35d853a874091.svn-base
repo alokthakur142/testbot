@@ -1,0 +1,180 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using NLog;
+using BeatrouteTallyIntegration.Utils;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegrationBase.Import;
+using BeatrouteTallyIntegrationBase.Tally;
+using BeatrouteTallyIntegrationBase.Common;
+using System.Net.NetworkInformation;
+
+namespace BeatrouteTallyIntegration.Controls
+{
+    public partial class ctrlDashboard : UserControl
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+
+        public ctrlDashboard()
+        {
+            InitializeComponent();
+            linkLabelAddCompany.Visible = false;
+            linkLabelGoToSettings.Visible = false;
+        }
+
+        private void ctrlDashboard_Load(object sender, EventArgs e)
+        {
+            LoadData();
+        }
+
+        public void LoadData()
+        {
+            try
+            {
+                this.SuspendLayout();
+                this.Cursor = Cursors.WaitCursor;
+                //RefreshCompanies();
+                CheckActiveCompany();
+                RefreshAvailableStatus();
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+                //MessagePopup.ShowError(ex.Message);
+            }
+            finally
+            {
+                this.ResumeLayout();
+                this.Cursor = Cursors.Default;
+            }
+        }
+
+        private void CheckActiveCompany()
+        {
+            try
+            {
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString,OrchidDALBase.ConnectionType.SQLite))
+                {
+                    if (!string.IsNullOrEmpty(Session.TallyIp) && !string.IsNullOrEmpty(Session.TallyPort))
+                    {
+                        ImportController impController = new ImportController();
+                        impController.UpdateCompanyName(); 
+                    }
+
+                    var activeCompany = uow.Company.GetList().Where(x => x.IsActive).FirstOrDefault();
+                    if (activeCompany == null)
+                    {
+                        linkLabelAddCompany.Visible = true;
+                        lblCompanyName.Text = "No active company";
+                    }
+                    else
+                    {
+                        linkLabelAddCompany.Visible = false;
+                        lblCompanyName.Text = activeCompany.CompanyName;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+            }
+        }
+
+        private void RefreshAvailableStatus()
+        {
+            string connectedImagePath = System.IO.Path.GetDirectoryName(Application.ExecutablePath) + @"\Resources\ConnectedImage3.png";
+            string errorImagePath = System.IO.Path.GetDirectoryName(Application.ExecutablePath) + @"\Resources\ErrorImage1.png";
+            try
+            {
+                this.Cursor = Cursors.WaitCursor;
+                ImportController ic = new ImportController();
+                TallyConnector tc = new TallyConnector(Session.TallyIp, Session.TallyPort);
+                //string returnMessage;
+                bool isTallyOpen = tc.IsTallyOpen();
+                if (isTallyOpen)
+                {
+                    lblTallyConnectivity.Text = "Connected";
+                    lblTallyConnectivity.ForeColor = Color.DarkOliveGreen;
+                    linkLabelGoToSettings.Visible = false;
+
+                    pictureBoxTally.Image = Image.FromFile(connectedImagePath);
+                }
+                else
+                {
+                    lblTallyConnectivity.Text = "Error";
+                    lblTallyConnectivity.ForeColor = Color.DarkRed;
+                    linkLabelGoToSettings.Visible = true;
+
+                    pictureBoxTally.Image = Image.FromFile(errorImagePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+                //panelTallyConnection.BackColor = Color.DarkRed;
+            }
+            finally
+            {
+                this.Cursor = Cursors.Default;
+            }
+
+            try
+            {
+
+                this.Cursor = Cursors.WaitCursor;
+                if (new Ping().Send("www.google.com").Status == IPStatus.Success)
+                {
+                    lblBeatRouteConnectivity.Text = "Connected";
+                    lblBeatRouteConnectivity.ForeColor = Color.DarkOliveGreen;
+
+                    pictureBoxBeatroute.Image = Image.FromFile(connectedImagePath);
+                }
+                else
+                {
+                    lblBeatRouteConnectivity.Text = "Error";
+                    lblBeatRouteConnectivity.ForeColor = Color.DarkRed;
+
+                    pictureBoxBeatroute.Image = Image.FromFile(errorImagePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+                //panelWebConnection.BackColor = Color.DarkRed;
+            }
+            finally
+            {
+                this.Cursor = Cursors.Default;
+            }
+        }
+
+        private void linkLabelGoToSettings_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            this.Hide();
+            ctrlSettings settings = new ctrlSettings();
+            this.Parent.Padding = new Padding(0, 70, 0, 0);
+            this.Parent.Controls.Add(settings);
+            settings.Dock = DockStyle.Fill;
+        }
+
+        private void linkLabelAddCompany_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            this.Hide();
+            ctrlCompanies companies = new ctrlCompanies();
+            this.Parent.Padding = new Padding(0, 70, 0, 0);
+            this.Parent.Controls.Add(companies);
+            companies.Dock = DockStyle.Fill;
+        }
+    }
+}

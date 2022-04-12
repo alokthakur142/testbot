@@ -1,0 +1,18 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BeatrouteTallyIntegrationBase.API
+{
+    public class logs
+    {
+        public DateTime timeStamp { get; set; }
+        public string typeOfLog { get; set; }
+        public string sourceOfLog { get; set; }
+        public string functionality { get; set; }
+        public string userName { get; set; }
+        public string message { get; set; }
+    }
+}

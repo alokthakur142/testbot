@@ -1,0 +1,333 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using BeatrouteTallyIntegrationBase.Common;
+using BeatrouteTallyIntegrationDAL.UnitOfWork;
+using OrchidDALBase;
+using BeatrouteTallyIntegrationDAL.Models;
+using BeatrouteTallyIntegration.Utils;
+using NLog;
+using System.Text.RegularExpressions;
+using BeatrouteTallyIntegrationBase.Utils;
+using BeatrouteTallyIntegrationBase.Tally;
+using System.Diagnostics;
+using System.IO;
+using BeatrouteTallyIntegration.Forms;
+
+namespace BeatrouteTallyIntegration.Controls
+{
+    public partial class ctrlSettings : UserControl
+    {
+        private static Logger _logger = LogManager.GetLogger("AppLog");
+
+        public ctrlSettings()
+        {
+            InitializeComponent();
+            lblVersionNo.Text = Session.VersionNo;
+            #region Set Version No
+            using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+            {
+                Settings versionNo = uow.Settings.GetList().Where(x => x.Key == "VERSION_NUMBER").FirstOrDefault();
+                if (versionNo == null)
+                {
+                    versionNo = new Settings();
+                    versionNo.Key = "VERSION_NUMBER";
+                    versionNo.Value = Session.VersionNo;
+
+                    uow.Settings.Add(versionNo);
+                }
+                else
+                {
+                    versionNo.Value = Session.VersionNo;
+
+                    uow.Settings.Update(versionNo);
+                }
+                #endregion 
+            }
+        }
+
+        private void btnSave_Click(object sender, EventArgs e)
+        {
+            try
+            {
+
+                if (ValidEntry())
+                {
+                    #region Save Base url to AppData folder 
+
+                    //Session.SetBaseUrl(txtBaseUrl.Text);
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|Base url is - " + Session.BaseUrl + "^");
+                    _logger.Debug("ImportWorker|" + Session.UserName + "|" + "^");
+
+                    #endregion
+
+                    Session.TallyIp = txtTallyIp.Text;
+                    Session.TallyPort = txtTallyPort.Text;
+                    Session.SyncFrequency = int.Parse(txtSyncFrequency.Text);
+
+                    using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, ConnectionType.SQLite))
+                    {
+
+                        #region Set IP
+                        Settings tallyIp = uow.Settings.GetList().Where(x => x.Key == "IP").FirstOrDefault();
+                        if (tallyIp == null)
+                        {
+                            tallyIp = new Settings();
+                            tallyIp.Key = "IP";
+                            tallyIp.Value = Session.TallyIp;
+                            uow.Settings.Add(tallyIp);
+                        }
+                        else
+                        {
+                            tallyIp.Value = Session.TallyIp;
+                            uow.Settings.Update(tallyIp);
+                        }
+                        #endregion
+
+                        #region Set Port
+                        Settings tallyPort = uow.Settings.GetList().Where(x => x.Key == "PORT").FirstOrDefault();
+                        if (tallyPort == null)
+                        {
+                            tallyPort = new Settings();
+                            tallyPort.Key = "PORT";
+                            tallyPort.Value = Session.TallyPort;
+                            uow.Settings.Add(tallyPort);
+                        }
+                        else
+                        {
+                            tallyPort.Value = Session.TallyPort;
+                            uow.Settings.Update(tallyPort);
+                        }
+                        #endregion
+
+                        # region Set frequency
+                        Settings frequency = uow.Settings.GetList().Where(x => x.Key == "FREQUENCY").FirstOrDefault();
+                        if (frequency == null)
+                        {
+                            frequency = new Settings();
+                            frequency.Key = "FREQUENCY";
+                            frequency.Value = Session.SyncFrequency.ToString();
+                            uow.Settings.Add(frequency);
+                        }
+                        else
+                        {
+                            frequency.Value = Session.SyncFrequency.ToString();
+                            uow.Settings.Update(frequency);
+                        }
+                        #endregion
+
+                        #region Set Range
+                        Settings frequencyRange = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "RANGE").FirstOrDefault();
+                        if (frequencyRange == null)
+                        {
+                            frequencyRange = new Settings();
+                            frequencyRange.Key = "RANGE";
+                            frequencyRange.Value = cmbFreqRange.Text;
+
+                            uow.Settings.Add(frequencyRange);
+                        }
+                        else
+                        {
+                            frequencyRange.Value = cmbFreqRange.Text;
+                            uow.Settings.Update(frequencyRange);
+                        }
+                        #endregion
+
+                        #region Set Product Filter
+                        Settings productFilter = uow.Settings.GetList().Where(x => x.Key == "PRODUCT_FILTER").FirstOrDefault();
+                        if (productFilter == null)
+                        {
+                            productFilter = new Settings();
+                            productFilter.Key = "PRODUCT_FILTER";
+                            productFilter.Value = "";
+
+                            uow.Settings.Add(productFilter);
+                        }
+                        #endregion                       
+                        
+                    }
+
+                    bool isSaved = ApiHelper.PostSettings();
+                    if (isSaved)
+                        MessagePopup.ShowMessage("Settings saved successfully");
+                    else
+                        MessagePopup.ShowError("Error saving settings.\nPlease check log for details");
+
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("Import Worker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+
+                if (ex.Message.Contains("SQL logic error") && !string.IsNullOrEmpty(Session.TallyIp) && !string.IsNullOrEmpty(Session.TallyPort))
+                {
+                    string[] errors = ex.Message.Split('\r', '\n');
+                    MessagePopup.ShowError("In Settings table  " + errors[2]);
+                }
+                else
+                    MessagePopup.ShowError("Error saving settings.\nPlease check App Log for details");
+            }
+        }
+
+        private bool ValidEntry()
+        {
+            if (string.IsNullOrEmpty(txtTallyIp.Text))
+            {
+                MessagePopup.ShowError("Tally IP should not be blank");
+                return false;
+            }
+            if (string.IsNullOrEmpty(txtTallyPort.Text))
+            {
+                MessagePopup.ShowError("Tally Port should not be blank");
+                return false;
+            }
+            if (string.IsNullOrEmpty(txtSyncFrequency.Text))
+            {
+                MessagePopup.ShowError("Sync Frequency should not be blank");
+                return false;
+            }
+            //if (string.IsNullOrEmpty(txtBaseUrl.Text))
+            //{
+            //    MessagePopup.ShowError("Base url should not be blank");
+            //    return false;
+            //}
+            if (!string.IsNullOrEmpty(txtTallyIp.Text) && !string.IsNullOrEmpty(txtTallyPort.Text))
+            {
+                TallyConnector tallyConnector = new TallyConnector(txtTallyIp.Text, txtTallyPort.Text);
+                bool isTallyOpen = tallyConnector.IsTallyOpen();
+                if (!isTallyOpen)
+                {
+                    MessagePopup.ShowError("Tally not open for the given IP and Port. Please check Tally configuration and refresh.");
+                    ErrorLogger.LogError(_logger, "Setting Control", "ImportWorker|" + Session.UserName + "|Tally not open for the given IP and Port. Please check Tally configuration and refresh." + "^");
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void ctrlSettings_Load(object sender, EventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(Session.BaseUrl))
+                    Session.BaseUrl = Session.GetBaseUrl();
+
+                string[] rangeArray = { "Hours", "Minutes" };
+                foreach (var item in rangeArray)
+                {
+                    cmbFreqRange.Items.Add(item);
+                }
+                cmbFreqRange.SelectedItem = cmbFreqRange.Items[1];
+                bool settingUpdated = ApiHelper.GetSettings();
+                //bool settingUpdated = true;
+                if (!settingUpdated)
+                    ErrorLogger.LogError(_logger, "Get Settings", "ImportWorker|" + Session.UserName + "|Error getting settings. Initiating default settings" + "^");
+
+
+                //Logic : When loading settings in dashboard it will get data from url, if not found then load fom db
+                using (UnitOfWork uow = new UnitOfWork(Session.ConnectionString, OrchidDALBase.ConnectionType.SQLite))
+                {
+
+                    Settings tallyIp = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "IP").FirstOrDefault();
+                    if (tallyIp != null && settingUpdated)
+                    {
+                        Session.TallyIp = tallyIp.Value;
+                        txtTallyIp.Text = Session.TallyIp;
+                    }
+                    else
+                        Session.TallyIp = "localhost";
+
+                    Settings tallyPort = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "PORT").FirstOrDefault();
+                    if (tallyPort != null && settingUpdated)
+                    {
+                        Session.TallyPort = tallyPort.Value;
+                        txtTallyPort.Text = Session.TallyPort;
+                    }
+                    else
+                        Session.TallyPort = "9000";
+
+                    Settings frequency = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "FREQUENCY").FirstOrDefault();
+                    if (frequency != null && settingUpdated)
+                    {
+                        Session.SyncFrequency = Convert.ToInt32(frequency.Value);
+                        txtSyncFrequency.Text = Session.SyncFrequency.ToString();
+                    }
+                    else
+                        Session.SyncFrequency = 4;
+
+
+                    Settings productFilter = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "PRODUCT_FILTER").FirstOrDefault();
+                    if (productFilter != null && settingUpdated)
+                    {
+                        Session.ProductFilter = productFilter.Value;
+                        //txtProductFilter.Text = Session.ProductFilter;
+                    }
+
+                    lblVersionNo.Text = Session.VersionNo;
+                    _logger.Info("ImportWorker|" + Session.UserName + "|Version number - " + Session.VersionNo + "^");
+
+                    Settings frequencyRange = uow.Settings.GetList().Where(x => x.Key.ToUpper() == "RANGE").FirstOrDefault();
+                    if (frequencyRange != null && settingUpdated)
+                        cmbFreqRange.SelectedItem = frequencyRange.Value == "Hours" ? cmbFreqRange.Items[0] : cmbFreqRange.Items[1];
+                    else
+                        cmbFreqRange.SelectedItem = cmbFreqRange.Items[1];
+
+                }
+                //txtBaseUrl.Text = Session.BaseUrl;
+                //Session.BaseUrl = txtBaseUrl.Text;
+                btnSave.Visible = true;
+                btnCancel.Visible = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + ex + "^");
+                _logger.Fatal("ImportWorker|" + Session.UserName + "|" + "^");
+                if (ex.Message.Contains("SQL logic error"))
+                {
+                    string[] errors = ex.Message.Split('\r', '\n');
+                    MessagePopup.ShowError("In Settings table  " + errors[2]);
+                }
+            }
+        }
+
+        private void btnCancel_Click(object sender, EventArgs e)
+        {
+            DialogResult dr = MessageBox.Show("Do you want to cancel?", "Question", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (dr == DialogResult.Yes)
+            {
+                //this.Parent.Controls.Remove(this);
+                ctrlSettings control = new ctrlSettings();
+                this.Parent.Controls.Add(control);
+                control.Dock = DockStyle.Fill;
+            }
+
+        }
+
+        private void txtTallyIp_TextChanged(object sender, EventArgs e)
+        {
+            btnSave.Visible = true;
+            btnCancel.Visible = true;
+        }
+
+        private void txtTallyPort_TextChanged(object sender, EventArgs e)
+        {
+            btnSave.Visible = true;
+            btnCancel.Visible = true;
+        }
+
+        private void txtSyncFrequency_TextChanged(object sender, EventArgs e)
+        {
+            btnSave.Visible = true;
+            btnCancel.Visible = true;
+        }
+
+        //Biplab 02/12/2021 - For Opening the License Agreement 
+    }
+}
